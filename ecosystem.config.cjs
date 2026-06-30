@@ -4,34 +4,38 @@ module.exports = {
       name: 'vm-gateway',
       script: 'src/gateway/server.ts',
       interpreter: 'bun',
-      env: {
-        NODE_ENV: 'development',
-      },
+      env: { NODE_ENV: 'development' },
     },
     {
       name: 'vm-fleet-worker',
       script: 'src/fleet/worker.ts',
       interpreter: 'bun',
-      env: {
-        NODE_ENV: 'development',
-      },
+      env: { NODE_ENV: 'development', VENDOR_ID: '1' },
     },
     {
       name: 'vm-inbound-processor',
       script: 'src/workers/main.ts',
       interpreter: 'bun',
-      env: {
-        NODE_ENV: 'development',
-      },
+      env: { NODE_ENV: 'development' },
+    },
+    {
+      name: 'vm-release-worker',
+      script: 'src/workers/releaseMain.ts',
+      interpreter: 'bun',
+      env: { NODE_ENV: 'development' },
+    },
+    {
+      name: 'vm-embed-worker',
+      script: 'src/workers/embedMain.ts',
+      interpreter: 'bun',
+      env: { NODE_ENV: 'development' },
     },
     {
       name: 'vm-dashboard',
-      script: 'bun x vite',
+      script: 'index.ts',
+      interpreter: 'bun',
       cwd: 'dashboard',
-      args: '--port 5173 --host 0.0.0.0',
-      env: {
-        NODE_ENV: 'development',
-      },
+      env: { NODE_ENV: 'development', DASHBOARD_PORT: '5173' },
     },
   ],
 };

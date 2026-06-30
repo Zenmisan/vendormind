@@ -1,4 +1,4 @@
-import { prisma } from '../shared/prisma/client';
+import { prisma } from './prisma/client';
 import Anthropic from "@anthropic-ai/sdk";
 
 export interface SessionContext {
@@ -62,7 +62,7 @@ export class ContextService {
   }
 
   private static async summarize(oldSummary: string, role: string, content: string): Promise<string> {
-    const useLLM = process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_API_KEY.startsWith('sk-ant-');
+    const useLLM = process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_API_KEY.includes('...');
     if (!useLLM) {
       return (oldSummary ? oldSummary + '\n' : '') + `${role}: ${content}`;
     }

@@ -7,6 +7,8 @@ import { AgentService, MockAgentService } from '../shared/agent.service';
 import { BillingService } from '../shared/billing.service';
 import { CircuitBreaker } from '../shared/utils/circuitBreaker';
 
+const GRACEFUL_PAUSE_MSG = "I need to pause for a moment — let me get a team member for you! We'll be right with you.";
+
 const worker = new Worker<InboundMessageJob>(
   INBOUND_QUEUE,
   async (job) => {
@@ -16,81 +18,92 @@ const worker = new Worker<InboundMessageJob>(
 
       console.log(`Processing inbound message from ${customerPhone} for vendor ${vendorId}`);
 
-      // 1. Economic Defense: Circuit Breaker (Customer Throttling)
+      // 1. Circuit breaker: customer throttling
       const throttled = await CircuitBreaker.isThrottled(vId, customerPhone);
       if (throttled) {
         console.warn(`🛑 Customer ${customerPhone} throttled for vendor ${vendorId}`);
-        return; 
+        return;
       }
 
-      // 2. Economic Defense: Wallet Balance Check
+      // 2. Wallet check
       const billing = await BillingService.canProcess(vId);
       if (!billing.allowed) {
-        console.warn(`🛑 Vendor ${vendorId} blocked: ${billing.reason} (Balance: ${billing.balance})`);
-        await outboundQueue.add(`billing-alert:${job.id}`, {
+        console.warn(`🛑 Vendor ${vendorId} hard-blocked: ${billing.reason} (balance: ${billing.balance})`);
+        await outboundQueue.add(`billing-block:${job.id}`, {
           vendorId,
           remoteJid: `${customerPhone}@s.whatsapp.net`,
-          content: "I'm sorry, my services are currently offline. Please try again later."
+          content: GRACEFUL_PAUSE_MSG
         });
         return;
       }
 
-      // 3. Identify/Create Customer
+      // 3. Overdraft: allow processing but send graceful pause & set handoff
+      if (billing.overdraft) {
+        console.warn(`⚠️ Vendor ${vendorId} in overdraft (balance: ${billing.balance})`);
+        await outboundQueue.add(`overdraft-pause:${job.id}`, {
+          vendorId,
+          remoteJid: `${customerPhone}@s.whatsapp.net`,
+          content: GRACEFUL_PAUSE_MSG
+        });
+        // Find customer to set handoff flag
+        const overdraftCustomer = await prisma.customer.findUnique({
+          where: { vendorId_phoneNumber: { vendorId: vId, phoneNumber: customerPhone } }
+        });
+        if (overdraftCustomer) {
+          await redisConnection.set(`handoff:${overdraftCustomer.id}`, '1', 'EX', 3600);
+        }
+        return;
+      }
+
+      // 4. Identify / create customer
       let customer = await prisma.customer.findUnique({
         where: { vendorId_phoneNumber: { vendorId: vId, phoneNumber: customerPhone } }
       });
-
       if (!customer) {
         customer = await prisma.customer.create({
-          data: {
-            vendorId: vId,
-            phoneNumber: customerPhone,
-            name: 'WhatsApp Customer'
-          }
+          data: { vendorId: vId, phoneNumber: customerPhone, name: 'WhatsApp Customer' }
         });
       }
 
-      // 2. Get current context
+      // 5. Check handoff flag — if set, skip bot and wait for human
+      const handoffKey = `handoff:${customer.id}`;
+      const handoffActive = await redisConnection.get(handoffKey);
+      if (handoffActive) {
+        console.log(`🤝 Handoff active for customer ${customer.id} — skipping bot`);
+        return;
+      }
+
+      // 6. Load context
       const context = await ContextService.getContext(customer.id);
 
-      // 3. Handle message types & Call Agent
+      // 7. Route by message type & run agent
+      const useLLM = !!(process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_API_KEY.includes('...'));
       let responseText = '';
-      const useLLM = process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_API_KEY.startsWith('sk-ant-');
 
       if (type === 'text' && content) {
-        if (useLLM) {
-          responseText = await AgentService.process(customer.id, content, context);
-        } else {
-          responseText = await MockAgentService.process(content, context);
-        }
+        responseText = useLLM
+          ? await AgentService.process(customer.id, vId, content, context)
+          : await MockAgentService.process(content, context);
         await ContextService.updateContext(customer.id, { role: 'user', content });
       } else if (type === 'location' && location) {
         const locationNote = `[User sent precise location: Lat ${location.lat}, Lng ${location.lng}]`;
-        if (useLLM) {
-          responseText = await AgentService.process(customer.id, locationNote, context);
-        } else {
-          responseText = await MockAgentService.process(locationNote, context);
-        }
+        responseText = useLLM
+          ? await AgentService.process(customer.id, vId, locationNote, context)
+          : await MockAgentService.process(locationNote, context);
         await ContextService.updateContext(customer.id, { role: 'user', content: locationNote });
-      } else if (type === 'audio') {
-        responseText = "I received your voice note! I'm still learning how to listen, but I'll be able to process these soon.";
       } else {
-        responseText = "I'm sorry, I can only process text and location messages right now.";
+        responseText = "I can only process text and location messages right now.";
       }
 
-      // 4. Update context with assistant response
+      // 8. Update context with assistant response
       await ContextService.updateContext(customer.id, { role: 'assistant', content: responseText });
 
-      // 5. Economic Defense: Billing Deduction
+      // 9. Deduct billing
       await BillingService.deduct(vId, 'INBOUND_MESSAGE');
-      if (useLLM) {
-        await BillingService.deduct(vId, 'LLM_SONNET');
-      } else {
-        await BillingService.deduct(vId, 'MOCK_AGENT');
-      }
+      await BillingService.deduct(vId, useLLM ? 'LLM_SONNET' : 'MOCK_AGENT');
       await BillingService.deduct(vId, 'OUTBOUND_MESSAGE');
 
-      // 6. Enqueue Outbound
+      // 10. Send reply
       console.log(`✅ Enqueueing outbound reply to ${customerPhone}`);
       await outboundQueue.add(`reply:${job.id}`, {
         vendorId,
@@ -99,12 +112,11 @@ const worker = new Worker<InboundMessageJob>(
       });
     } catch (error: any) {
       console.error('❌ ERROR in Inbound Processor:', error);
-      throw error; // Re-throw to let BullMQ handle retries if needed
+      throw error;
     }
   },
   { connection: redisConnection }
 );
 
 console.log('👷 Inbound Processor started');
-
 export default worker;

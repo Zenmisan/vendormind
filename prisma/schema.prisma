@@ -45,7 +45,8 @@ model Product {
   name        String
   description String?
   price       Decimal                     @db.Decimal(10, 2)
-  stock       Int                         @default(0)
+  stock         Int                         @default(0)
+  reservedStock Int                         @default(0)
   imageUrl    String?
   embedding   Unsupported("vector(1536)")? // For OpenAI embeddings, adjusted if using others
   createdAt   DateTime                    @default(now()) @db.Timestamptz
@@ -85,10 +86,23 @@ model Order {
   updatedAt   DateTime    @updatedAt @db.Timestamptz
   items       OrderItem[]
   paymentLink String?
+  reservation SoftReservation?
 
   @@index([vendorId])
   @@index([customerId])
   @@map("orders")
+}
+
+model SoftReservation {
+  id        BigInt   @id @default(autoincrement())
+  orderId   BigInt   @unique
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  expiresAt DateTime @db.Timestamptz
+  released  Boolean  @default(false)
+  createdAt DateTime @default(now()) @db.Timestamptz
+
+  @@index([expiresAt])
+  @@map("soft_reservations")
 }
 
 model OrderItem {
