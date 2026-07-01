@@ -1,10 +1,13 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Package, ShoppingBag, Wallet, LogOut, ShoppingCart } from 'lucide-react';
+import {
+  Home, LayoutDashboard, LogOut, Package, PlugZap, Settings,
+  ShoppingBag, ShoppingCart, Wallet,
+} from 'lucide-react';
 
 const nav = [
-  { to: '/dashboard', label: 'Dashboard', Icon: LayoutDashboard },
-  { to: '/products',  label: 'Products',  Icon: Package },
-  { to: '/orders',    label: 'Orders',    Icon: ShoppingBag },
+  { to: '/dashboard', label: 'Overview', Icon: LayoutDashboard },
+  { to: '/products',  label: 'Catalog',  Icon: Package },
+  { to: '/orders',    label: 'Orders',   Icon: ShoppingBag },
 ];
 
 export default function Sidebar({ active }: { active: string }) {
@@ -18,7 +21,7 @@ export default function Sidebar({ active }: { active: string }) {
       </div>
 
       <nav className="sidebar-nav">
-        <span className="sidebar-section-label">Menu</span>
+        <span className="sidebar-section-label">Store</span>
         {nav.map(({ to, label, Icon }) => (
           <NavLink
             key={to}
@@ -29,17 +32,31 @@ export default function Sidebar({ active }: { active: string }) {
             {label}
           </NavLink>
         ))}
+
+        <span className="sidebar-section-label">Setup</span>
+        <NavLink to="/onboard" className="sidebar-link">
+          <PlugZap size={15} />
+          WhatsApp setup
+        </NavLink>
+        <NavLink to="/contact" className="sidebar-link">
+          <Settings size={15} />
+          Support
+        </NavLink>
       </nav>
 
       <div className="sidebar-footer">
-        <span className="sidebar-section-label">Account</span>
+        <span className="sidebar-section-label">Wallet</span>
         <NavLink to="/onboard" className="sidebar-link">
           <Wallet size={15} />
-          Top up wallet
+          Balance & top up
+        </NavLink>
+        <NavLink to="/" className="sidebar-link">
+          <Home size={15} />
+          Landing page
         </NavLink>
         <NavLink to="/" className="sidebar-link">
           <LogOut size={15} />
-          Back to home
+          Sign out
         </NavLink>
       </div>
     </aside>
