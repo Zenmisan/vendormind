@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle, Upload, Wifi, ArrowRight, Loader2, ShoppingCart } from 'lucide-react';
+import QRCode from 'react-qr-code';
 
 const API = (import.meta as any)?.env?.VITE_API_URL ?? 'http://localhost:3000';
 type Step = 1 | 2 | 3;
@@ -273,12 +274,8 @@ export default function Onboard() {
                   </div>
                 ) : qr ? (
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '1.25rem', display: 'inline-block', marginBottom: '1rem' }}>
-                      <div style={{ width: 192, height: 192, background: 'var(--surface)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0.75rem' }}>
-                        <p style={{ fontSize: '0.65rem', color: 'var(--text-3)', wordBreak: 'break-all', fontFamily: 'var(--font-mono)', lineHeight: 1.4 }}>
-                          {qr.slice(0, 100)}...
-                        </p>
-                      </div>
+                    <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '1.25rem', display: 'inline-block', marginBottom: '1rem' }}>
+                      <QRCode value={qr} size={192} />
                     </div>
                     <p style={{ fontSize: '0.8rem', color: 'var(--text-3)' }}>Waiting for scan...</p>
                   </div>
