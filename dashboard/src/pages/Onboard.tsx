@@ -16,8 +16,12 @@ const steps = [
 
 export default function Onboard() {
   const navigate = useNavigate();
-  const [step, setStep] = useState<Step>(1);
-  const [vendor, setVendor] = useState<Vendor | null>(null);
+  const savedVendorId = localStorage.getItem('vendorId');
+  const savedVendorName = localStorage.getItem('vendorName');
+  const [step, setStep] = useState<Step>(savedVendorId ? 3 : 1);
+  const [vendor, setVendor] = useState<Vendor | null>(
+    savedVendorId ? { id: savedVendorId, name: savedVendorName ?? '' } : null
+  );
   const [qr, setQr] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -53,7 +57,10 @@ export default function Onboard() {
       });
       const data = await res.json() as { vendorId?: string; message?: string };
       if (!res.ok) throw new Error(data.message || 'Registration failed');
-      setVendor({ id: data.vendorId!, name: fd.get('name') as string });
+      const v = { id: data.vendorId!, name: fd.get('name') as string };
+      localStorage.setItem('vendorId', v.id);
+      localStorage.setItem('vendorName', v.name);
+      setVendor(v);
       setStep(2);
     } catch (err: any) {
       setError(err.message);
@@ -91,11 +98,9 @@ export default function Onboard() {
             </div>
             <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1rem', color: 'var(--text)' }}>VendorMind</span>
           </button>
-          {vendor && (
-            <button className="btn-ghost" onClick={() => navigate('/dashboard')}>
-              Skip to dashboard <ArrowRight size={13} />
-            </button>
-          )}
+          <button className="btn-ghost" onClick={() => navigate('/dashboard')}>
+            Skip to dashboard <ArrowRight size={13} />
+          </button>
         </div>
       </header>
 
