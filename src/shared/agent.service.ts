@@ -13,7 +13,16 @@ export class AgentService {
       { role: "user", content: text }
     ];
 
-    const systemPrompt = `You are a helpful sales assistant for a vendor on WhatsApp.
+    const vendor = await prisma.vendor.findUnique({
+      where: { id: vendorId },
+      select: { name: true, agentName: true, agentTone: true }
+    });
+
+    const agentName = vendor?.agentName || vendor?.name || "Sales Agent";
+    const agentTone = vendor?.agentTone || "Friendly";
+
+    const systemPrompt = `You are a helpful sales assistant named "${agentName}" for a vendor on WhatsApp.
+Your tone should be ${agentTone}.
 Summary of previous conversation: ${context.summary}
 
 Your goal is to help customers browse products, add to cart, check delivery, and complete payment.

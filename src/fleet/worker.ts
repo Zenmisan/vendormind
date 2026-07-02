@@ -42,9 +42,19 @@ async function startSock(vendorId: string = VENDOR_ID) {
 
   const sock = makeWASocket({
     version,
-    printQRInTerminal: true,
+    printQRInTerminal: false,
     auth: state,
-    logger
+    logger,
+    browser: ['Mac OS', 'Chrome', '121.0.0.0'],
+    connectTimeoutMs: 120000,
+    defaultQueryTimeoutMs: 0,
+    keepAliveIntervalMs: 15000,
+    retryRequestDelayMs: 250,
+    generateHighQualityLinkPreview: false,
+    syncFullHistory: false,
+    markOnlineOnConnect: true,
+    shouldIgnoreJid: (jid) => jid === 'status@broadcast' || jid?.endsWith('@broadcast'),
+    getMessage: async (_key) => ({ conversation: '' }),
   });
 
   sock.ev.on('creds.update', saveCreds);
@@ -53,16 +63,39 @@ async function startSock(vendorId: string = VENDOR_ID) {
     const { connection, lastDisconnect, qr } = update;
 
     if (qr) {
-      await prisma.whatsAppSession.upsert({
-        where: { sessionId: `${vendorId}:qr` },
-        update: { data: { qr }, updatedAt: new Date() },
-        create: { vendorId: vId, sessionId: `${vendorId}:qr`, data: { qr } }
-      });
+      // Check if vendor requested pairing code instead of QR
+      const pairingPhone = await redisConnection.get(`pairing_phone:${vendorId}`);
+      if (pairingPhone && !state.creds.registered) {
+        try {
+          const code = await sock.requestPairingCode(pairingPhone.replace(/\D/g, ''));
+          await redisConnection.del(`pairing_phone:${vendorId}`);
+          console.log(`📱 [Vendor ${vendorId}] Pairing code: ${code}`);
+          await prisma.whatsAppSession.upsert({
+            where: { sessionId: `${vendorId}:qr` },
+            update: { data: { pairingCode: code }, updatedAt: new Date() },
+            create: { vendorId: vId, sessionId: `${vendorId}:qr`, data: { pairingCode: code } }
+          });
+        } catch (err: any) {
+          console.error(`[Vendor ${vendorId}] Pairing code request failed:`, err.message);
+        }
+      } else {
+        await prisma.whatsAppSession.upsert({
+          where: { sessionId: `${vendorId}:qr` },
+          update: { data: { qr }, updatedAt: new Date() },
+          create: { vendorId: vId, sessionId: `${vendorId}:qr`, data: { qr } }
+        });
+      }
     }
 
     if (connection === 'close') {
-      const shouldReconnect = (lastDisconnect?.error as Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
-      if (shouldReconnect) startSock(vendorId);
+      const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
+      if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
+        console.log(`[Vendor ${vendorId}] Logged out — clearing session`);
+        await prisma.whatsAppSession.deleteMany({ where: { vendorId: vId } });
+      } else if (statusCode !== 440) {
+        const delay = Math.min(5000 * (2 ** Math.min(sock.ev.listenerCount('connection.update'), 4)), 60000);
+        setTimeout(() => startSock(vendorId), delay);
+      }
     } else if (connection === 'open') {
       console.log(`🚀 [Vendor ${vendorId}] WhatsApp connected`);
       await prisma.whatsAppSession.upsert({

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   AlertTriangle, ArrowRight, CheckCircle, CreditCard, MessageSquare,
-  Package, RefreshCw, Send, ShoppingBag, TrendingUp, Wallet, Wifi,
+  Package, RefreshCw, Send, ShoppingBag, TrendingUp, Wallet, Wifi, WifiOff,
 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 
@@ -16,6 +17,15 @@ interface OpsData {
   lowBalanceVendors: Array<{ id: string; name: string; balance: number }>;
 }
 
+interface Order {
+  id: string;
+  customer: string;
+  total: string;
+  status: string;
+  createdAt: string;
+  items: string[];
+}
+
 const sampleOrders = [
   { id: 'VM-1042', customer: '+234 801 234 8871', total: 12500, status: 'Pending payment', time: '12 min ago' },
   { id: 'VM-1041', customer: '+234 806 811 0944', total: 7800, status: 'Paid', time: '32 min ago' },
@@ -23,16 +33,42 @@ const sampleOrders = [
 ];
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [ops, setOps] = useState<OpsData | null>(null);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [waConnected, setWaConnected] = useState(false);
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState(new Date());
+
+  const VENDOR_ID = localStorage.getItem('vendorId') ?? '1';
 
   const load = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API}/ops/dashboard`);
-      if (res.ok) setOps(await res.json() as OpsData);
-    } catch {}
+      const [opsRes, ordersRes, waRes, walletRes] = await Promise.all([
+        fetch(`${API}/ops/dashboard`),
+        fetch(`${API}/vendors/${VENDOR_ID}/orders?limit=5`),
+        fetch(`${API}/vendors/${VENDOR_ID}/whatsapp/qr`),
+        fetch(`${API}/vendors/${VENDOR_ID}/wallet`)
+      ]);
+
+      if (opsRes.ok) setOps(await opsRes.ok ? await opsRes.json() : null);
+      if (ordersRes.ok) {
+        const data = await ordersRes.json() as { orders: Order[] };
+        setOrders(data.orders || []);
+      }
+      if (waRes.ok) {
+        const data = await waRes.json() as { status: string };
+        setWaConnected(data.status === 'connected');
+      }
+      if (walletRes.ok) {
+        const data = await walletRes.json() as { balance: number };
+        setWalletBalance(data.balance);
+      }
+    } catch (err) {
+      console.error('Failed to load dashboard data:', err);
+    }
     setLoading(false);
     setLastRefresh(new Date());
   };
@@ -43,7 +79,6 @@ export default function Dashboard() {
   const inboundDone = ops?.queues.inbound.completed ?? 0;
   const outboundDone = ops?.queues.outbound.completed ?? 0;
   const failedJobs = (ops?.queues.inbound.failed ?? 0) + (ops?.queues.outbound.failed ?? 0);
-  const lowBalance = ops?.lowBalanceVendors[0];
 
   const stats = [
     { label: 'Active chats', value: activeChats, sub: 'Customers in conversation', Icon: MessageSquare, color: '#3b82f6', bg: 'rgba(59,130,246,0.1)' },
@@ -52,6 +87,9 @@ export default function Dashboard() {
     { label: 'Needs attention', value: failedJobs, sub: 'Failed queue jobs', Icon: AlertTriangle, color: failedJobs ? '#ef4444' : '#14b8a6', bg: failedJobs ? 'rgba(239,68,68,0.1)' : 'rgba(20,184,166,0.1)' },
   ];
 
+  const displayOrders = orders.length > 0 ? orders : [];
+  const walletLow = walletBalance !== null && walletBalance < 2.0;
+
   return (
     <div className="app-shell" style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)' }}>
       <Sidebar active="dashboard" />
@@ -59,10 +97,17 @@ export default function Dashboard() {
       <main className="app-main" style={{ flex: 1, padding: '2rem 2.5rem', overflowX: 'hidden' }}>
         <div className="page-header animate-fade-up" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', marginBottom: '2rem' }}>
           <div>
-            <div className="badge" style={{ background: 'rgba(22,163,74,0.08)', color: 'var(--brand)', marginBottom: '0.65rem' }}>
-              <Wifi size={13} />
-              WhatsApp agent online
-            </div>
+            {waConnected ? (
+              <div className="badge" style={{ background: 'rgba(22,163,74,0.08)', color: 'var(--brand)', marginBottom: '0.65rem' }}>
+                <Wifi size={13} />
+                WhatsApp agent online
+              </div>
+            ) : (
+              <div className="badge" style={{ background: 'rgba(245,158,11,0.1)', color: '#d97706', marginBottom: '0.65rem' }}>
+                <WifiOff size={13} />
+                WhatsApp agent offline (QR scan needed)
+              </div>
+            )}
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.75rem', fontWeight: 800, margin: 0, color: 'var(--text)' }}>
               Store overview
             </h1>
@@ -94,27 +139,46 @@ export default function Dashboard() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', marginBottom: '1.25rem' }}>
               <div>
                 <h2 style={{ fontSize: '1rem', fontWeight: 800, margin: 0 }}>Recent orders</h2>
-                <p style={{ fontSize: '0.78rem', color: 'var(--text-3)', margin: '0.2rem 0 0' }}>Preview until live order endpoint is connected</p>
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-3)', margin: '0.2rem 0 0' }}>Real-time orders processed by the AI agent</p>
               </div>
-              <a className="btn-ghost" href="/orders" style={{ textDecoration: 'none' }}>
+              <button className="btn-ghost" onClick={() => navigate('/orders')}>
                 View all <ArrowRight size={13} />
-              </a>
+              </button>
             </div>
             <div style={{ display: 'grid', gap: '0.75rem' }}>
-              {sampleOrders.map(order => (
-                <div key={order.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '1rem', alignItems: 'center', padding: '0.9rem 0', borderBottom: '1px solid var(--border-subtle)' }}>
-                  <div>
-                    <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 800 }}>{order.id}</p>
-                    <p style={{ margin: '0.15rem 0 0', fontSize: '0.76rem', color: 'var(--text-3)' }}>{order.customer} · {order.time}</p>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <p className="mono" style={{ margin: 0, fontWeight: 800 }}>₦{order.total.toLocaleString()}</p>
-                    <span className="badge" style={{ marginTop: '0.25rem', background: order.status === 'Paid' ? 'rgba(22,163,74,0.1)' : 'rgba(245,158,11,0.1)', color: order.status === 'Paid' ? '#16a34a' : '#d97706' }}>
-                      {order.status}
-                    </span>
-                  </div>
+              {loading ? (
+                <div style={{ display: 'grid', gap: '0.5rem', padding: '1rem 0' }}>
+                  <div className="skeleton" style={{ height: 48 }} />
+                  <div className="skeleton" style={{ height: 48 }} />
                 </div>
-              ))}
+              ) : displayOrders.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-3)' }}>
+                  <ShoppingBag size={28} style={{ strokeWidth: 1.5, marginBottom: '0.5rem' }} />
+                  <p style={{ margin: 0, fontSize: '0.86rem', fontWeight: 600 }}>No orders received yet</p>
+                  <p style={{ margin: '0.1rem 0 0', fontSize: '0.74rem' }}>Wait for a customer to complete WhatsApp checkout.</p>
+                </div>
+              ) : (
+                displayOrders.map(order => (
+                  <div key={order.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '1rem', alignItems: 'center', padding: '0.9rem 0', borderBottom: '1px solid var(--border-subtle)' }}>
+                    <div>
+                      <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 800 }}>Order #{order.id}</p>
+                      <p style={{ margin: '0.15rem 0 0', fontSize: '0.76rem', color: 'var(--text-3)' }}>
+                        {order.customer} · {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <p className="mono" style={{ margin: 0, fontWeight: 800 }}>₦{Number(order.total).toLocaleString()}</p>
+                      <span className={`badge ${order.status === 'PAID' ? 'bg-brand/10 text-brand' : 'bg-amber-500/10 text-amber-500'}`} style={{
+                        marginTop: '0.25rem',
+                        background: order.status === 'PAID' ? 'rgba(22,163,74,0.1)' : 'rgba(245,158,11,0.1)',
+                        color: order.status === 'PAID' ? '#16a34a' : '#d97706'
+                      }}>
+                        {order.status}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </section>
 
@@ -126,18 +190,18 @@ export default function Dashboard() {
               </div>
               {loading ? (
                 <div className="skeleton" style={{ height: 80 }} />
-              ) : lowBalance ? (
+              ) : walletLow ? (
                 <>
-                  <p style={{ margin: 0, color: '#d97706', fontWeight: 800 }}>{lowBalance.name} needs top up</p>
-                  <p style={{ margin: '0.35rem 0 1rem', color: 'var(--text-3)', fontSize: '0.8rem' }}>Balance: ₦{(lowBalance.balance * 500).toFixed(0)}</p>
-                  <button className="btn-primary" style={{ width: '100%' }}>Top up wallet</button>
+                  <p style={{ margin: 0, color: '#d97706', fontWeight: 800 }}>Low Balance Alert</p>
+                  <p style={{ margin: '0.35rem 0 1rem', color: 'var(--text-3)', fontSize: '0.8rem' }}>Current Balance: ₦{walletBalance?.toFixed(2)}</p>
+                  <button className="btn-primary" onClick={() => navigate('/wallet')} style={{ width: '100%' }}>Top up wallet</button>
                 </>
               ) : (
                 <div className="success-panel" style={{ padding: '0.9rem' }}>
                   <CheckCircle size={18} color="var(--brand)" />
                   <div>
-                    <p>Wallet is healthy</p>
-                    <span>Automation can continue normally.</span>
+                    <p style={{ fontWeight: 800, fontSize: '0.85rem' }}>Wallet: ₦{walletBalance?.toFixed(2)}</p>
+                    <span style={{ fontSize: '0.72rem' }}>Automation running smoothly.</span>
                   </div>
                 </div>
               )}
@@ -146,11 +210,15 @@ export default function Dashboard() {
             <div className="card" style={{ padding: '1.25rem' }}>
               <h2 style={{ fontSize: '0.95rem', fontWeight: 800, margin: '0 0 1rem' }}>Next setup actions</h2>
               {[
-                { Icon: Package, text: 'Upload or refresh catalog' },
-                { Icon: CreditCard, text: 'Confirm Nomba checkout settings' },
-                { Icon: ShoppingBag, text: 'Review order fulfilment flow' },
-              ].map(({ Icon, text }) => (
-                <div key={text} style={{ display: 'flex', gap: '0.65rem', alignItems: 'center', padding: '0.55rem 0', borderBottom: '1px solid var(--border-subtle)' }}>
+                { Icon: Package, text: 'Upload or refresh catalog', path: '/products' },
+                { Icon: CreditCard, text: 'Confirm Nomba checkout settings', path: '/wallet' },
+                { Icon: ShoppingBag, text: 'Review order fulfilment flow', path: '/orders' },
+              ].map(({ Icon, text, path }) => (
+                <div
+                  key={text}
+                  onClick={() => navigate(path)}
+                  style={{ display: 'flex', gap: '0.65rem', alignItems: 'center', padding: '0.55rem 0', borderBottom: '1px solid var(--border-subtle)', cursor: 'pointer' }}
+                >
                   <Icon size={15} color="var(--text-3)" />
                   <span style={{ fontSize: '0.82rem', color: 'var(--text-2)', fontWeight: 600 }}>{text}</span>
                 </div>

@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import {
-  Home, LayoutDashboard, LogOut, Package, PlugZap, Settings,
-  ShoppingBag, ShoppingCart, Wallet,
+  LayoutDashboard, LogOut, Package, PlugZap, Settings,
+  ShoppingBag, ShoppingCart, Wallet, MessageSquare
 } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../lib/firebase';
@@ -10,6 +10,7 @@ const nav = [
   { to: '/dashboard', label: 'Overview', Icon: LayoutDashboard },
   { to: '/products',  label: 'Catalog',  Icon: Package },
   { to: '/orders',    label: 'Orders',   Icon: ShoppingBag },
+  { to: '/conversations', label: 'Conversations', Icon: MessageSquare },
 ];
 
 export default function Sidebar({ active }: { active: string }) {
@@ -36,25 +37,30 @@ export default function Sidebar({ active }: { active: string }) {
         ))}
 
         <span className="sidebar-section-label">Setup</span>
-        <NavLink to="/onboard" className="sidebar-link">
+        <NavLink
+          to="/onboard"
+          className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
+        >
           <PlugZap size={15} />
           WhatsApp setup
         </NavLink>
-        <NavLink to="/contact" className="sidebar-link">
+        <NavLink
+          to="/settings"
+          className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
+        >
           <Settings size={15} />
-          Support
+          Settings
         </NavLink>
       </nav>
 
       <div className="sidebar-footer">
         <span className="sidebar-section-label">Wallet</span>
-        <NavLink to="/onboard" className="sidebar-link">
+        <NavLink
+          to="/wallet"
+          className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
+        >
           <Wallet size={15} />
           Balance & top up
-        </NavLink>
-        <NavLink to="/" className="sidebar-link">
-          <Home size={15} />
-          Landing page
         </NavLink>
         <button
           className="sidebar-link"

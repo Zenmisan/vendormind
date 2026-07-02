@@ -19,9 +19,9 @@ const features = [
 ];
 
 const steps = [
-  { n: '01', title: 'Register',        desc: 'Create your vendor account. You get ₦10 in free credits the moment you sign up.' },
-  { n: '02', title: 'Upload Catalog',  desc: 'Drop in an Excel sheet with product names, prices, descriptions, and stock levels.' },
-  { n: '03', title: 'Scan & Go Live',  desc: 'Scan a QR code with your WhatsApp number. Your AI agent is live in under 60 seconds.' },
+  { n: '01', title: 'Register & Upload', desc: 'Create your vendor account and drop in an Excel sheet of your product catalog.' },
+  { n: '02', title: 'Customize Persona', desc: 'Define your AI assistant name, tone (Friendly, Energetic, Professional), and custom greeting.' },
+  { n: '03', title: 'Scan QR & Activate', desc: 'Scan the QR code with WhatsApp, top up your pre-paid wallet, and go live instantly.' },
 ];
 
 const painPoints = [
@@ -109,6 +109,15 @@ export default function Landing() {
                 </a>
               ))}
             </div>
+            {user ? (
+              <button className="btn-ghost" onClick={() => navigate('/dashboard')} style={{ padding: '0.5rem 1.1rem', fontSize: '0.875rem', border: 'none' }}>
+                Dashboard
+              </button>
+            ) : (
+              <button className="btn-ghost" onClick={signInWithGoogle} style={{ padding: '0.5rem 1.1rem', fontSize: '0.875rem', border: 'none' }}>
+                Log in
+              </button>
+            )}
             <button className="btn-primary" onClick={handleGetStarted} style={{ padding: '0.5rem 1.1rem', fontSize: '0.875rem' }}>
               Get Started <ArrowRight size={13} />
             </button>

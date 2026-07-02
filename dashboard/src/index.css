@@ -42,6 +42,115 @@
   --radius-xl: 20px;
 }
 
+/* ── Dark Mode Scope for Console ────────────────────────────── */
+.app-shell {
+  --brand: #4ade80;
+  --brand-hover: #22c55e;
+  --brand-glow: rgba(74, 222, 128, 0.14);
+  --brand-dim: rgba(74, 222, 128, 0.08);
+
+  --bg: #080c14;
+  --surface: #0e1522;
+  --surface-raised: #141d2e;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-subtle: rgba(255, 255, 255, 0.04);
+
+  --text: #f9fafb;
+  --text-2: #d1d5db;
+  --text-3: #8e9cae;
+
+  --sidebar-bg: #05080e;
+  --sidebar-active: rgba(74, 222, 128, 0.1);
+  --sidebar-active-border: #4ade80;
+  --sidebar-text: #8e9cae;
+  --sidebar-text-hover: #f9fafb;
+  --sidebar-text-active: #ffffff;
+  --sidebar-separator: rgba(255, 255, 255, 0.04);
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-sm: 0 4px 6px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 10px 15px rgba(0, 0, 0, 0.4), 0 4px 6px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 20px 25px rgba(0, 0, 0, 0.5), 0 10px 10px rgba(0, 0, 0, 0.4);
+  --shadow-brand: 0 0 16px rgba(74, 222, 128, 0.2);
+  
+  background: var(--bg);
+  background-image:
+    radial-gradient(at 0% 0%, rgba(74, 222, 128, 0.06) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(59, 130, 246, 0.04) 0px, transparent 50%);
+  color: var(--text);
+}
+
+/* Overrides for elements inside the dark app shell */
+.app-shell .btn-primary {
+  color: #05080e !important;
+  background: var(--brand) !important;
+  font-weight: 700 !important;
+  box-shadow: 0 4px 14px rgba(74, 222, 128, 0.3) !important;
+}
+.app-shell .btn-primary:hover:not(:disabled) {
+  background: var(--brand-hover) !important;
+  box-shadow: 0 6px 20px rgba(74, 222, 128, 0.45) !important;
+}
+
+.app-shell .btn-ghost {
+  background: transparent !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text) !important;
+}
+.app-shell .btn-ghost:hover {
+  background: var(--surface-raised) !important;
+  border-color: rgba(74, 222, 128, 0.2) !important;
+  color: var(--text) !important;
+}
+
+.app-shell .input {
+  background: #0f1624 !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border) !important;
+}
+.app-shell .input:focus {
+  border-color: var(--brand) !important;
+  box-shadow: 0 0 0 3px var(--brand-glow) !important;
+}
+
+.app-shell .success-panel {
+  background: rgba(74, 222, 128, 0.06) !important;
+  border: 1px solid rgba(74, 222, 128, 0.15) !important;
+}
+.app-shell .success-panel p {
+  color: var(--brand) !important;
+}
+.app-shell .success-panel span {
+  color: var(--text-2) !important;
+}
+
+.app-shell .skeleton {
+  background: linear-gradient(90deg, #16222f 25%, #1f2d3d 37%, #16222f 63%) !important;
+  background-size: 400px 100% !important;
+}
+
+.app-shell .upload-dropzone {
+  border-color: var(--border) !important;
+  background: rgba(255, 255, 255, 0.02) !important;
+}
+.app-shell .upload-dropzone:hover {
+  border-color: var(--brand) !important;
+  background: rgba(74, 222, 128, 0.04) !important;
+}
+.app-shell .upload-dropzone p {
+  color: var(--text) !important;
+}
+
+.app-shell .data-table tbody tr:hover td {
+  background: rgba(74, 222, 128, 0.04) !important;
+  color: var(--text) !important;
+}
+
+.chat-bubble-bot {
+  background: #f3f4f6 !important;
+  color: #0d1117 !important;
+}
+
 /* ── Base ───────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
 

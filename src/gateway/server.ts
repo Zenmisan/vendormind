@@ -7,6 +7,7 @@ import * as XLSX from 'xlsx';
 import { prisma } from '../shared/prisma/client';
 import { inboundQueue, outboundQueue, embedQueue, EmbedProductJob } from '../shared/queue';
 import { NombaService } from '../shared/nomba.service';
+import { redisConnection } from '../shared/redis';
 
 const fastify = Fastify({
   logger: {
@@ -210,6 +211,20 @@ const start = async () => {
     };
   });
 
+  // ── Update Order Status ───────────────────────────────────────────
+  fastify.put<{ Params: { id: string, orderId: string }; Body: { status: string } }>('/vendors/:id/orders/:orderId', async (request, reply) => {
+    let orderId: bigint;
+    try { orderId = BigInt(request.params.orderId); }
+    catch { return reply.status(400).send({ error: 'Invalid order ID' }); }
+    const { status } = request.body;
+
+    const order = await prisma.order.update({
+      where: { id: orderId },
+      data: { status }
+    });
+    return { order: { id: order.id.toString(), status: order.status } };
+  });
+
   // ── WhatsApp QR Proxy ─────────────────────────────────────────────────
   fastify.get<{ Params: { id: string } }>('/vendors/:id/whatsapp/qr', async (request) => {
     const vendorId = BigInt(request.params.id);
@@ -222,6 +237,285 @@ const start = async () => {
     if (sessionData.connected) return { status: 'connected' };
     if (sessionData.qr) return { status: 'ready', qr: sessionData.qr };
     return { status: 'waiting' };
+  });
+  // ── Pairing Code Request ──────────────────────────────────────────
+  fastify.post<{ Params: { id: string }; Body: { phone: string } }>('/vendors/:id/whatsapp/pair', async (request, reply) => {
+    let vendorId: bigint;
+    try { vendorId = BigInt(request.params.id); }
+    catch { return reply.status(400).send({ error: 'Invalid vendor ID' }); }
+
+    const { phone } = request.body;
+    if (!phone) return reply.status(400).send({ error: 'phone required' });
+
+    // Clear existing session so fleet worker starts fresh and fires QR event
+    await prisma.whatsAppSession.deleteMany({
+      where: { vendorId, sessionId: `${request.params.id}:creds` }
+    });
+    await prisma.whatsAppSession.deleteMany({
+      where: { vendorId, sessionId: `${request.params.id}:qr` }
+    });
+
+    // Signal fleet worker to use pairing code on next QR event
+    await redisConnection.set(`pairing_phone:${request.params.id}`, phone.replace(/\D/g, ''), 'EX', 300);
+
+    return { status: 'pending', message: 'Pairing code will be ready in ~5 seconds. Poll /whatsapp/pairing-code.' };
+  });
+
+  // ── Get Pairing Code ──────────────────────────────────────────────
+  fastify.get<{ Params: { id: string } }>('/vendors/:id/whatsapp/pairing-code', async (request) => {
+    const vendorId = BigInt(request.params.id);
+    const session = await prisma.whatsAppSession.findFirst({
+      where: { vendorId, sessionId: { contains: ':qr' } },
+      orderBy: { updatedAt: 'desc' }
+    });
+    if (!session) return { status: 'waiting' };
+    const data = session.data as any;
+    if (data.connected) return { status: 'connected' };
+    if (data.pairingCode) return { status: 'ready', code: data.pairingCode };
+    return { status: 'waiting' };
+  });
+
+  // ── Wallet Details ────────────────────────────────────────────────
+  fastify.get<{ Params: { id: string } }>('/vendors/:id/wallet', async (request, reply) => {
+    let id: bigint;
+    try { id = BigInt(request.params.id); }
+    catch { return reply.status(400).send({ error: 'Invalid vendor ID' }); }
+    const vendor = await prisma.vendor.findUnique({
+      where: { id },
+      select: { walletBalance: true }
+    });
+    if (!vendor) return reply.status(404).send({ error: 'Vendor not found' });
+    return {
+      balance: Number(vendor.walletBalance),
+      currency: 'NGN',
+      transactions: [
+        { id: 'tx_1', description: 'Welcome Free Credit', amount: 10.0, type: 'credit', createdAt: new Date().toISOString() }
+      ]
+    };
+  });
+
+  // ── Conversations List ────────────────────────────────────────────
+  fastify.get<{ Params: { id: string } }>('/vendors/:id/conversations', async (request, reply) => {
+    let id: bigint;
+    try { id = BigInt(request.params.id); }
+    catch { return reply.status(400).send({ error: 'Invalid vendor ID' }); }
+    const sessions = await prisma.wa_session.findMany({
+      where: {
+        customer: { vendorId: id }
+      },
+      include: {
+        customer: true
+      },
+      orderBy: {
+        updatedAt: 'desc'
+      }
+    });
+
+    const conversations = [];
+    for (const s of sessions) {
+      const ctx = s.context as any;
+      const messages = ctx?.recentMessages || [];
+      const lastMsg = messages[messages.length - 1];
+      const snippet = lastMsg ? (typeof lastMsg.content === 'string' ? lastMsg.content : JSON.stringify(lastMsg.content)) : '';
+      const handoffActive = await redisConnection.get(`handoff:${s.customerId}`);
+
+      conversations.push({
+        id: s.customerId.toString(),
+        customer: s.customer.name || s.customer.phoneNumber,
+        phoneNumber: s.customer.phoneNumber,
+        lastMessage: snippet,
+        timestamp: s.updatedAt.toISOString(),
+        status: handoffActive === '1' ? 'HANDED_OFF' : 'ACTIVE'
+      });
+    }
+
+    return { conversations };
+  });
+
+  // ── Conversation Detail ───────────────────────────────────────────
+  fastify.get<{ Params: { id: string, customerId: string } }>('/vendors/:id/conversations/:customerId', async (request, reply) => {
+    let customerId: bigint;
+    try { customerId = BigInt(request.params.customerId); }
+    catch { return reply.status(400).send({ error: 'Invalid customer ID' }); }
+
+    const session = await prisma.wa_session.findUnique({
+      where: { customerId },
+      include: { customer: true }
+    });
+    if (!session) return reply.status(404).send({ error: 'Conversation not found' });
+
+    const ctx = session.context as any;
+    const messages = ctx?.recentMessages || [];
+    const handoffActive = await redisConnection.get(`handoff:${customerId}`);
+
+    return {
+      customerId: customerId.toString(),
+      customer: session.customer.name || session.customer.phoneNumber,
+      phoneNumber: session.customer.phoneNumber,
+      summary: ctx?.summary || '',
+      status: handoffActive === '1' ? 'HANDED_OFF' : 'ACTIVE',
+      messages: messages.map((m: any, idx: number) => ({
+        id: idx.toString(),
+        role: m.role,
+        content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content),
+        timestamp: session.updatedAt.toISOString()
+      }))
+    };
+  });
+
+  // ── Handoff Toggle ────────────────────────────────────────────────
+  fastify.post<{ Params: { id: string, customerId: string }; Body: { handoff: boolean } }>('/vendors/:id/conversations/:customerId/handoff', async (request, reply) => {
+    let customerId: bigint;
+    try { customerId = BigInt(request.params.customerId); }
+    catch { return reply.status(400).send({ error: 'Invalid customer ID' }); }
+    const { handoff } = request.body;
+
+    const handoffKey = `handoff:${customerId}`;
+    if (handoff) {
+      await redisConnection.set(handoffKey, '1', 'EX', 3600);
+    } else {
+      await redisConnection.del(handoffKey);
+    }
+    return { status: handoff ? 'HANDED_OFF' : 'ACTIVE' };
+  });
+
+  // ── Add Product ───────────────────────────────────────────────────
+  fastify.post<{ Params: { id: string }; Body: { name: string; price: number; description?: string; stock: number } }>('/vendors/:id/products', async (request, reply) => {
+    let id: bigint;
+    try { id = BigInt(request.params.id); }
+    catch { return reply.status(400).send({ error: 'Invalid vendor ID' }); }
+    const { name, price, description, stock } = request.body;
+
+    const product = await prisma.product.create({
+      data: {
+        vendorId: id,
+        name,
+        price: Number(price),
+        description: description || null,
+        stock: Number(stock)
+      }
+    });
+
+    const text = [product.name, product.description].filter(Boolean).join(' — ');
+    await embedQueue.add<EmbedProductJob>(`embed:${product.id}`, {
+      productId: product.id.toString(),
+      text
+    }, { jobId: `embed:${product.id}` });
+
+    return {
+      product: {
+        id: product.id.toString(),
+        name: product.name,
+        description: product.description,
+        price: product.price.toString(),
+        stock: product.stock,
+        reservedStock: product.reservedStock
+      }
+    };
+  });
+
+  // ── Update Product ────────────────────────────────────────────────
+  fastify.put<{ Params: { id: string, productId: string }; Body: { name?: string; price?: number; description?: string; stock?: number } }>('/vendors/:id/products/:productId', async (request, reply) => {
+    let productId: bigint;
+    try { productId = BigInt(request.params.productId); }
+    catch { return reply.status(400).send({ error: 'Invalid product ID' }); }
+    const { name, price, description, stock } = request.body;
+
+    const updateData: any = {};
+    if (name !== undefined) updateData.name = name;
+    if (price !== undefined) updateData.price = Number(price);
+    if (description !== undefined) updateData.description = description || null;
+    if (stock !== undefined) updateData.stock = Number(stock);
+
+    const product = await prisma.product.update({
+      where: { id: productId },
+      data: updateData
+    });
+
+    if (name !== undefined || description !== undefined) {
+      const text = [product.name, product.description].filter(Boolean).join(' — ');
+      await embedQueue.add<EmbedProductJob>(`embed:${product.id}`, {
+        productId: product.id.toString(),
+        text
+      }, { jobId: `embed:${product.id}`, removeOnComplete: true });
+    }
+
+    return {
+      product: {
+        id: product.id.toString(),
+        name: product.name,
+        description: product.description,
+        price: product.price.toString(),
+        stock: product.stock,
+        reservedStock: product.reservedStock
+      }
+    };
+  });
+
+  // ── Delete Product ────────────────────────────────────────────────
+  fastify.delete<{ Params: { id: string, productId: string } }>('/vendors/:id/products/:productId', async (request, reply) => {
+    let productId: bigint;
+    try { productId = BigInt(request.params.productId); }
+    catch { return reply.status(400).send({ error: 'Invalid product ID' }); }
+
+    await prisma.product.delete({
+      where: { id: productId }
+    });
+    return { success: true };
+  });
+
+  // ── Get Settings ──────────────────────────────────────────────────
+  fastify.get<{ Params: { id: string } }>('/vendors/:id/settings', async (request, reply) => {
+    let id: bigint;
+    try { id = BigInt(request.params.id); }
+    catch { return reply.status(400).send({ error: 'Invalid vendor ID' }); }
+    const vendor = await prisma.vendor.findUnique({
+      where: { id },
+      select: { name: true, email: true, phoneNumber: true, agentName: true, agentTone: true, agentGreeting: true }
+    });
+    if (!vendor) return reply.status(404).send({ error: 'Vendor not found' });
+    return {
+      settings: {
+        name: vendor.name,
+        email: vendor.email,
+        phoneNumber: vendor.phoneNumber,
+        agentName: vendor.agentName || vendor.name,
+        agentTone: vendor.agentTone || 'Friendly',
+        agentGreeting: vendor.agentGreeting || `Hello! I am ${vendor.agentName || vendor.name}'s AI sales agent. How can I help you today?`
+      }
+    };
+  });
+
+  // ── Save Settings ─────────────────────────────────────────────────
+  fastify.post<{ Params: { id: string }; Body: { name?: string; email?: string; agentName?: string; agentTone?: string; agentGreeting?: string } }>('/vendors/:id/settings', async (request, reply) => {
+    let id: bigint;
+    try { id = BigInt(request.params.id); }
+    catch { return reply.status(400).send({ error: 'Invalid vendor ID' }); }
+    const { name, email, agentName, agentTone, agentGreeting } = request.body;
+
+    const updateData: any = {};
+    if (name !== undefined) updateData.name = name;
+    if (email !== undefined) updateData.email = email;
+    if (agentName !== undefined) updateData.agentName = agentName;
+    if (agentTone !== undefined) updateData.agentTone = agentTone;
+    if (agentGreeting !== undefined) updateData.agentGreeting = agentGreeting;
+
+    const vendor = await prisma.vendor.update({
+      where: { id },
+      data: updateData,
+      select: { name: true, email: true, phoneNumber: true, agentName: true, agentTone: true, agentGreeting: true }
+    });
+
+    return {
+      settings: {
+        name: vendor.name,
+        email: vendor.email,
+        phoneNumber: vendor.phoneNumber,
+        agentName: vendor.agentName,
+        agentTone: vendor.agentTone,
+        agentGreeting: vendor.agentGreeting
+      }
+    };
   });
 
   // ── Nomba Webhook ─────────────────────────────────────────────────

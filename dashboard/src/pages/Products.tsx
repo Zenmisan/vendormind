@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
 import {
   AlertTriangle, CheckCircle, ChevronDown, ChevronUp, FileSpreadsheet,
-  Package, RefreshCw, Search, Upload,
+  Package, RefreshCw, Search, Upload, Plus, Edit, Trash2, X, Loader2
 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 
 const API = (import.meta as any)?.env?.VITE_API_URL ?? 'http://localhost:3000';
-const VENDOR_ID = '1';
 
 interface Product {
   id: string;
@@ -15,6 +14,7 @@ interface Product {
   stock: number;
   reservedStock: number;
   description: string | null;
+  createdAt?: string;
 }
 
 const sampleProducts: Product[] = [
@@ -31,6 +31,20 @@ export default function Products() {
   const [sortField, setSortField] = useState<keyof Product>('name');
   const [sortAsc, setSortAsc] = useState(true);
   const [lastUpload, setLastUpload] = useState<string | null>(null);
+
+  // CRUD Modals State
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [formLoading, setFormLoading] = useState(false);
+
+  // Form Fields
+  const [name, setName] = useState('');
+  const [price, setPrice] = useState('');
+  const [stock, setStock] = useState('');
+  const [description, setDescription] = useState('');
+
+  const VENDOR_ID = localStorage.getItem('vendorId') ?? '1';
 
   const load = async () => {
     setLoading(true);
@@ -56,7 +70,7 @@ export default function Products() {
     fd.append('file', e.target.files[0]);
     try {
       const res = await fetch(`${API}/vendors/${VENDOR_ID}/catalog`, { method: 'POST', body: fd });
-      const data = await res.json();
+      const data = await res.json() as { count?: number };
       setLastUpload(`${data.count ?? 'New'} products queued for indexing`);
       load();
     } catch {
@@ -65,6 +79,80 @@ export default function Products() {
       setUploading(false);
       e.target.value = '';
     }
+  };
+
+  const handleAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormLoading(true);
+    try {
+      const res = await fetch(`${API}/vendors/${VENDOR_ID}/products`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, price: Number(price), stock: Number(stock), description }),
+      });
+      if (res.ok) {
+        setIsAddOpen(false);
+        resetForm();
+        load();
+      }
+    } catch (err) {
+      console.error('Add failed:', err);
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProduct) return;
+    setFormLoading(true);
+    try {
+      const res = await fetch(`${API}/vendors/${VENDOR_ID}/products/${editingProduct.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, price: Number(price), stock: Number(stock), description }),
+      });
+      if (res.ok) {
+        setIsEditOpen(false);
+        setEditingProduct(null);
+        resetForm();
+        load();
+      }
+    } catch (err) {
+      console.error('Edit failed:', err);
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleDelete = async (productId: string) => {
+    if (!window.confirm('Are you sure you want to delete this product?')) return;
+    try {
+      const res = await fetch(`${API}/vendors/${VENDOR_ID}/products/${productId}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        load();
+      }
+    } catch (err) {
+      console.error('Delete failed:', err);
+    }
+  };
+
+  const openEdit = (p: Product) => {
+    setEditingProduct(p);
+    setName(p.name);
+    setPrice(p.price);
+    setStock(String(p.stock));
+    setDescription(p.description || '');
+    setIsEditOpen(true);
+  };
+
+  const resetForm = () => {
+    setName('');
+    setPrice('');
+    setStock('');
+    setDescription('');
   };
 
   const toggleSort = (field: keyof Product) => {
@@ -99,6 +187,7 @@ export default function Products() {
       <Sidebar active="products" />
 
       <main className="app-main" style={{ flex: 1, padding: '2rem 2.5rem' }}>
+        {/* Header */}
         <div className="page-header animate-fade-up" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', marginBottom: '1.5rem' }}>
           <div>
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.75rem', fontWeight: 800, margin: 0 }}>
@@ -113,14 +202,19 @@ export default function Products() {
               <RefreshCw size={13} />
               Refresh
             </button>
+            <button className="btn-ghost" onClick={() => { resetForm(); setIsAddOpen(true); }}>
+              <Plus size={13} />
+              Add Product
+            </button>
             <label className="btn-primary" style={{ cursor: uploading ? 'not-allowed' : 'pointer', opacity: uploading ? 0.6 : 1 }}>
               <Upload size={13} />
-              {uploading ? 'Uploading...' : 'Upload catalog'}
+              {uploading ? 'Uploading...' : 'Upload Excel'}
               <input type="file" accept=".xlsx,.xls,.csv" onChange={uploadCatalog} style={{ display: 'none' }} disabled={uploading} />
             </label>
           </div>
         </div>
 
+        {/* Stats */}
         <div className="stat-grid animate-fade-up-1" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1.25rem' }}>
           {[
             { label: 'Catalog items', value: displayProducts.length, Icon: Package, color: '#16a34a', bg: 'rgba(22,163,74,0.1)' },
@@ -138,6 +232,7 @@ export default function Products() {
           ))}
         </div>
 
+        {/* Toolbar */}
         <section className="card animate-fade-up-2" style={{ padding: '1rem', marginBottom: '1.25rem' }}>
           <div className="catalog-toolbar">
             <div style={{ position: 'relative', flex: 1 }}>
@@ -151,6 +246,7 @@ export default function Products() {
           {lastUpload && <p style={{ margin: '0.75rem 0 0', fontSize: '0.8rem', color: 'var(--text-2)' }}>{lastUpload}</p>}
         </section>
 
+        {/* Table list */}
         <div className="card animate-fade-up-3" style={{ overflow: 'hidden' }}>
           {loading ? (
             <div style={{ padding: '2rem 1.5rem', display: 'grid', gap: '0.75rem' }}>
@@ -181,11 +277,16 @@ export default function Products() {
                       </th>
                     ))}
                     <th>Available</th>
+                    <th>Embed Index</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.map(p => {
                     const available = p.stock - p.reservedStock;
+                    // Derive embedding status: if it is a live product, it queues embeddings instantly
+                    const isEmbedded = !usingSamples;
+
                     return (
                       <tr key={p.id}>
                         <td>
@@ -200,6 +301,31 @@ export default function Products() {
                             {available}
                           </span>
                         </td>
+                        <td>
+                          {isEmbedded ? (
+                            <span className="badge" style={{ background: 'rgba(22,163,74,0.08)', color: 'var(--brand)' }}>
+                              ● Embedded
+                            </span>
+                          ) : (
+                            <span className="badge" style={{ background: 'rgba(245,158,11,0.08)', color: '#d97706' }}>
+                              ● Demo static
+                            </span>
+                          )}
+                        </td>
+                        <td>
+                          {!usingSamples ? (
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                              <button className="btn-ghost" onClick={() => openEdit(p)} style={{ padding: '0.4rem' }}>
+                                <Edit size={13} />
+                              </button>
+                              <button className="btn-ghost" onClick={() => handleDelete(p.id)} style={{ padding: '0.4rem', color: '#ef4444', borderColor: 'rgba(239,68,68,0.15)' }}>
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-3)' }}>Locked (Sample)</span>
+                          )}
+                        </td>
                       </tr>
                     );
                   })}
@@ -209,6 +335,86 @@ export default function Products() {
           )}
         </div>
       </main>
+
+      {/* ── Add Product Modal ────────────────────────────────────── */}
+      {isAddOpen && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 100,
+          background: 'rgba(13,17,23,0.5)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
+        }}>
+          <div className="card-raised animate-fade-up" style={{ width: '100%', maxWidth: 460, background: 'var(--surface)', padding: '2rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', fontWeight: 800, margin: 0 }}>Add New Product</h2>
+              <button className="btn-ghost" onClick={() => setIsAddOpen(false)} style={{ padding: '0.4rem', border: 'none' }}><X size={16} /></button>
+            </div>
+            <form onSubmit={handleAdd} style={{ display: 'grid', gap: '1rem' }}>
+              <label style={{ display: 'grid', gap: '0.35rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-2)' }}>
+                Product Name
+                <input className="input" value={name} onChange={e => setName(e.target.value)} required placeholder="e.g. Party Jollof Rice" />
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <label style={{ display: 'grid', gap: '0.35rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-2)' }}>
+                  Price (₦)
+                  <input className="input" type="number" min="0" value={price} onChange={e => setPrice(e.target.value)} required placeholder="2500" />
+                </label>
+                <label style={{ display: 'grid', gap: '0.35rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-2)' }}>
+                  Stock Quantity
+                  <input className="input" type="number" min="0" value={stock} onChange={e => setStock(e.target.value)} required placeholder="50" />
+                </label>
+              </div>
+              <label style={{ display: 'grid', gap: '0.35rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-2)' }}>
+                Description
+                <textarea className="input" rows={3} value={description} onChange={e => setDescription(e.target.value)} placeholder="Product description for semantic search indexing..." />
+              </label>
+              <button type="submit" className="btn-primary" disabled={formLoading} style={{ marginTop: '0.5rem', padding: '0.75rem' }}>
+                {formLoading ? <Loader2 size={14} style={{ animation: 'spin-slow 1s linear infinite' }} /> : <Plus size={14} />}
+                {formLoading ? 'Creating Product...' : 'Add Product'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Edit Product Modal ───────────────────────────────────── */}
+      {isEditOpen && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 100,
+          background: 'rgba(13,17,23,0.5)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
+        }}>
+          <div className="card-raised animate-fade-up" style={{ width: '100%', maxWidth: 460, background: 'var(--surface)', padding: '2rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', fontWeight: 800, margin: 0 }}>Edit Product</h2>
+              <button className="btn-ghost" onClick={() => { setIsEditOpen(false); setEditingProduct(null); }} style={{ padding: '0.4rem', border: 'none' }}><X size={16} /></button>
+            </div>
+            <form onSubmit={handleEdit} style={{ display: 'grid', gap: '1rem' }}>
+              <label style={{ display: 'grid', gap: '0.35rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-2)' }}>
+                Product Name
+                <input className="input" value={name} onChange={e => setName(e.target.value)} required placeholder="e.g. Party Jollof Rice" />
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <label style={{ display: 'grid', gap: '0.35rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-2)' }}>
+                  Price (₦)
+                  <input className="input" type="number" min="0" value={price} onChange={e => setPrice(e.target.value)} required placeholder="2500" />
+                </label>
+                <label style={{ display: 'grid', gap: '0.35rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-2)' }}>
+                  Stock Quantity
+                  <input className="input" type="number" min="0" value={stock} onChange={e => setStock(e.target.value)} required placeholder="50" />
+                </label>
+              </div>
+              <label style={{ display: 'grid', gap: '0.35rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-2)' }}>
+                Description
+                <textarea className="input" rows={3} value={description} onChange={e => setDescription(e.target.value)} placeholder="Product description for semantic search indexing..." />
+              </label>
+              <button type="submit" className="btn-primary" disabled={formLoading} style={{ marginTop: '0.5rem', padding: '0.75rem' }}>
+                {formLoading ? <Loader2 size={14} style={{ animation: 'spin-slow 1s linear infinite' }} /> : <CheckCircle size={14} />}
+                {formLoading ? 'Saving Changes...' : 'Save Changes'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
