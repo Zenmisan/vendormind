@@ -42,3 +42,6 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 id_rsa*
 id_ed25519*
 id_ecdsa*
+
+# Kiro agent
+.agnst

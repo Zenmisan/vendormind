@@ -3,6 +3,8 @@ import {
   Home, LayoutDashboard, LogOut, Package, PlugZap, Settings,
   ShoppingBag, ShoppingCart, Wallet,
 } from 'lucide-react';
+import { signOut } from 'firebase/auth';
+import { auth } from '../lib/firebase';
 
 const nav = [
   { to: '/dashboard', label: 'Overview', Icon: LayoutDashboard },
@@ -57,7 +59,7 @@ export default function Sidebar({ active }: { active: string }) {
         <button
           className="sidebar-link"
           style={{ background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left' }}
-          onClick={() => { localStorage.clear(); window.location.href = '/'; }}
+          onClick={() => signOut(auth).then(() => { window.location.href = '/'; })}
         >
           <LogOut size={15} />
           Sign out

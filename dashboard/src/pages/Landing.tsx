@@ -5,6 +5,9 @@ import {
   ShieldCheck, ShoppingBag, ShoppingCart, Sparkles, Store,
   WalletCards, ArrowRight, Zap,
 } from 'lucide-react';
+import { signInWithPopup } from 'firebase/auth';
+import { auth, googleProvider } from '../lib/firebase';
+import { useAuth } from '../lib/AuthContext';
 
 const features = [
   { Icon: Bot,       title: 'Claude AI Agent',        desc: 'Understands product questions, remembers context, builds carts, and handles checkout from chat.',        color: '#6366f1', bg: 'rgba(99,102,241,0.08)' },
@@ -62,6 +65,21 @@ const faqs = [
 
 export default function Landing() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const signInWithGoogle = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+      navigate('/onboard');
+    } catch (err: any) {
+      console.error('Google sign-in failed:', err.message);
+    }
+  };
+
+  const handleGetStarted = () => {
+    if (user) navigate('/onboard');
+    else signInWithGoogle();
+  };
 
   return (
     <div style={{ minHeight: '100vh', background: '#fff', color: 'var(--text)', fontFamily: 'var(--font-sans)' }}>
@@ -91,7 +109,7 @@ export default function Landing() {
                 </a>
               ))}
             </div>
-            <button className="btn-primary" onClick={() => navigate('/onboard')} style={{ padding: '0.5rem 1.1rem', fontSize: '0.875rem' }}>
+            <button className="btn-primary" onClick={handleGetStarted} style={{ padding: '0.5rem 1.1rem', fontSize: '0.875rem' }}>
               Get Started <ArrowRight size={13} />
             </button>
           </div>
@@ -128,7 +146,7 @@ export default function Landing() {
             </p>
 
             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-              <button className="btn-primary" onClick={() => navigate('/onboard')} style={{ padding: '0.875rem 1.75rem', fontSize: '0.95rem' }}>
+              <button className="btn-primary" onClick={handleGetStarted} style={{ padding: '0.875rem 1.75rem', fontSize: '0.95rem' }}>
                 Get Started Free <ArrowRight size={15} />
               </button>
               <a href="#how-it-works" style={{
@@ -406,7 +424,7 @@ export default function Landing() {
                 Overdraft buffer of ₦1,250 included to finish active conversations even on an empty balance.
               </p>
             </div>
-            <button className="btn-primary" onClick={() => navigate('/onboard')} style={{ width: '100%', padding: '0.875rem', background: '#4ade80', color: '#0d1117', boxShadow: '0 4px 16px rgba(74,222,128,0.25)' }}>
+            <button className="btn-primary" onClick={handleGetStarted} style={{ width: '100%', padding: '0.875rem', background: '#4ade80', color: '#0d1117', boxShadow: '0 4px 16px rgba(74,222,128,0.25)' }}>
               Start with free credit <ArrowRight size={15} />
             </button>
           </div>
@@ -444,7 +462,7 @@ export default function Landing() {
           <p style={{ fontSize: '0.95rem', color: 'rgba(255,255,255,0.45)', margin: '0 0 2rem', lineHeight: 1.65 }}>
             Start with a catalog upload, connect your WhatsApp number, and let VendorMind handle the first reply through checkout.
           </p>
-          <button className="btn-primary" onClick={() => navigate('/onboard')} style={{ padding: '0.95rem 2.25rem', fontSize: '1rem' }}>
+          <button className="btn-primary" onClick={handleGetStarted} style={{ padding: '0.95rem 2.25rem', fontSize: '1rem' }}>
             Get Started Free <ArrowRight size={16} />
           </button>
           <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.25)', marginTop: '1rem' }}>No credit card required.</p>
