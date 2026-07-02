@@ -5,12 +5,15 @@ import {
 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 
+const API = (import.meta as any)?.env?.VITE_API_URL ?? 'http://localhost:3000';
+const VENDOR_ID = '1';
+
 type OrderStatus = 'PENDING' | 'PAID' | 'CANCELED' | 'DELIVERED';
 
 interface Order {
   id: string;
   customer: string;
-  total: number;
+  total: string;
   status: OrderStatus;
   createdAt: string;
   expiresIn?: string;
@@ -29,7 +32,7 @@ const sampleOrders: Order[] = [
   {
     id: 'VM-1042',
     customer: '+234 801 234 8871',
-    total: 12500,
+    total: '12500',
     status: 'PENDING',
     createdAt: new Date(Date.now() - 12 * 60 * 1000).toISOString(),
     expiresIn: '18 min left',
@@ -39,7 +42,7 @@ const sampleOrders: Order[] = [
   {
     id: 'VM-1041',
     customer: '+234 806 811 0944',
-    total: 7800,
+    total: '7800',
     status: 'PAID',
     createdAt: new Date(Date.now() - 42 * 60 * 1000).toISOString(),
     items: ['2x Small Chops Combo', '1x Chapman Bottle'],
@@ -48,7 +51,7 @@ const sampleOrders: Order[] = [
   {
     id: 'VM-1040',
     customer: '+234 704 219 3302',
-    total: 3000,
+    total: '3000',
     status: 'DELIVERED',
     createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
     items: ['1x Small Chops Combo'],
@@ -57,7 +60,7 @@ const sampleOrders: Order[] = [
   {
     id: 'VM-1039',
     customer: '+234 905 117 0024',
-    total: 2500,
+    total: '2500',
     status: 'CANCELED',
     createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
     items: ['1x Party Jollof Rice'],
@@ -73,8 +76,17 @@ export default function Orders() {
 
   const load = async () => {
     setLoading(true);
-    setOrders([]);
-    setLoading(false);
+    try {
+      const res = await fetch(`${API}/vendors/${VENDOR_ID}/orders`);
+      if (!res.ok) { console.error('Orders fetch failed:', res.status); setOrders([]); return; }
+      const data = await res.json() as { orders?: Order[] };
+      setOrders(data.orders ?? []);
+    } catch (err) {
+      console.error('Orders fetch error:', err);
+      setOrders([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { load(); }, []);
@@ -92,7 +104,7 @@ export default function Orders() {
     pending: displayOrders.filter(o => o.status === 'PENDING').length,
     paid: displayOrders.filter(o => o.status === 'PAID').length,
     delivered: displayOrders.filter(o => o.status === 'DELIVERED').length,
-    revenue: displayOrders.filter(o => ['PAID', 'DELIVERED'].includes(o.status)).reduce((sum, o) => sum + o.total, 0),
+    revenue: displayOrders.filter(o => ['PAID', 'DELIVERED'].includes(o.status)).reduce((sum, o) => sum + Number(o.total), 0),
   };
 
   return (
@@ -192,7 +204,7 @@ export default function Orders() {
                         <td>
                           <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-2)', lineHeight: 1.5 }}>{o.items.join(', ')}</p>
                         </td>
-                        <td><span className="mono" style={{ fontWeight: 800 }}>₦{o.total.toLocaleString()}</span></td>
+                        <td><span className="mono" style={{ fontWeight: 800 }}>₦{Number(o.total).toLocaleString()}</span></td>
                         <td>
                           <span className="badge" style={{ background: s.bg, color: s.color }}>
                             <StatusIcon size={12} />

@@ -16,7 +16,7 @@ export const usePrismaAuthState = async (sessionId: string): Promise<{ state: Au
       update: { data: JSON.parse(dataString) },
       create: { 
         sessionId: `${sessionId}:${key}`, 
-        vendorId: BigInt(1), // Hardcoded for initial Phase 1 demo
+        vendorId: BigInt(sessionId),
         data: JSON.parse(dataString) 
       }
     });

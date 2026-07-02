@@ -1,0 +1,142 @@
+services:
+  # ── Gateway (HTTP API) ────────────────────────────────────────────────
+  - type: web
+    name: vm-gateway
+    runtime: node
+    buildCommand: "curl -fsSL https://bun.sh/install | bash && export PATH=$HOME/.bun/bin:$PATH && bun install && bunx prisma generate && bunx prisma migrate deploy"
+    startCommand: "$HOME/.bun/bin/bun run src/gateway/server.ts"
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: vm-redis
+          property: connectionString
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: NOMBA_CLIENT_ID
+        sync: false
+      - key: NOMBA_CLIENT_SECRET
+        sync: false
+      - key: NOMBA_PARENT_ACCOUNT_ID
+        sync: false
+      - key: NOMBA_SUB_ACCOUNT_ID
+        sync: false
+      - key: NOMBA_ACCOUNT_ID
+        sync: false
+      - key: NOMBA_BASE_URL
+        value: https://api.nomba.com/v1
+      - key: LOG_LEVEL
+        value: info
+
+  # ── Fleet Worker (Baileys / WhatsApp) ────────────────────────────────
+  - type: worker
+    name: vm-fleet-worker
+    runtime: node
+    buildCommand: "curl -fsSL https://bun.sh/install | bash && export PATH=$HOME/.bun/bin:$PATH && bun install && bunx prisma generate"
+    startCommand: "$HOME/.bun/bin/bun run src/fleet/worker.ts"
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: VENDOR_ID
+        value: "4"
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: vm-redis
+          property: connectionString
+      - key: GROQ_API_KEY
+        sync: false
+
+  # ── Inbound Processor ────────────────────────────────────────────────
+  - type: worker
+    name: vm-inbound-processor
+    runtime: node
+    buildCommand: "curl -fsSL https://bun.sh/install | bash && export PATH=$HOME/.bun/bin:$PATH && bun install && bunx prisma generate"
+    startCommand: "$HOME/.bun/bin/bun run src/workers/main.ts"
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: vm-redis
+          property: connectionString
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: NOMBA_CLIENT_ID
+        sync: false
+      - key: NOMBA_CLIENT_SECRET
+        sync: false
+      - key: NOMBA_PARENT_ACCOUNT_ID
+        sync: false
+      - key: NOMBA_SUB_ACCOUNT_ID
+        sync: false
+      - key: NOMBA_ACCOUNT_ID
+        sync: false
+      - key: NOMBA_BASE_URL
+        value: https://api.nomba.com/v1
+
+  # ── Release Worker (soft reservation expiry) ─────────────────────────
+  - type: worker
+    name: vm-release-worker
+    runtime: node
+    buildCommand: "curl -fsSL https://bun.sh/install | bash && export PATH=$HOME/.bun/bin:$PATH && bun install && bunx prisma generate"
+    startCommand: "$HOME/.bun/bin/bun run src/workers/releaseMain.ts"
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: vm-redis
+          property: connectionString
+
+  # ── Embed Worker (pgvector product indexing) ──────────────────────────
+  - type: worker
+    name: vm-embed-worker
+    runtime: node
+    buildCommand: "curl -fsSL https://bun.sh/install | bash && export PATH=$HOME/.bun/bin:$PATH && bun install && bunx prisma generate"
+    startCommand: "$HOME/.bun/bin/bun run src/workers/embedMain.ts"
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: vm-redis
+          property: connectionString
+      - key: OPENAI_API_KEY
+        sync: false
+
+  # ── Redis ─────────────────────────────────────────────────────────────
+  - type: redis
+    name: vm-redis
+    plan: free
+    maxmemoryPolicy: allkeys-lru

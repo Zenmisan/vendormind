@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle, Upload, Wifi, ArrowRight, Loader2, ShoppingCart } from 'lucide-react';
+import { CheckCircle, Upload, Wifi, ArrowRight, Loader2, ShoppingCart, Store, FileSpreadsheet, MessageCircle, QrCode } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 
 const API = (import.meta as any)?.env?.VITE_API_URL ?? 'http://localhost:3000';
 type Step = 1 | 2 | 3;
@@ -252,10 +253,8 @@ export default function Onboard() {
                 ) : qr ? (
                   <div style={{ textAlign: 'center' }}>
                     <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '1.25rem', display: 'inline-block', marginBottom: '1rem' }}>
-                      <div style={{ width: 192, height: 192, background: 'var(--surface)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0.75rem' }}>
-                        <p style={{ fontSize: '0.65rem', color: 'var(--text-3)', wordBreak: 'break-all', fontFamily: 'var(--font-mono)', lineHeight: 1.4 }}>
-                          {qr.slice(0, 100)}...
-                        </p>
+                      <div style={{ width: 208, height: 208, background: '#ffffff', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0.5rem' }}>
+                        <QRCodeSVG value={qr} size={192} bgColor="#ffffff" fgColor="#0d1117" level="M" />
                       </div>
                     </div>
                     <p style={{ fontSize: '0.82rem', color: 'var(--text-3)', margin: '0.75rem 0 0' }}>Waiting for scan...</p>

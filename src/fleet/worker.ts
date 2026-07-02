@@ -65,7 +65,11 @@ async function startSock(vendorId: string = VENDOR_ID) {
       if (shouldReconnect) startSock(vendorId);
     } else if (connection === 'open') {
       console.log(`🚀 [Vendor ${vendorId}] WhatsApp connected`);
-      await prisma.whatsAppSession.deleteMany({ where: { sessionId: `${vendorId}:qr` } });
+      await prisma.whatsAppSession.upsert({
+        where: { sessionId: `${vendorId}:qr` },
+        update: { data: { connected: true }, updatedAt: new Date() },
+        create: { vendorId: vId, sessionId: `${vendorId}:qr`, data: { connected: true } },
+      });
     }
   });
 

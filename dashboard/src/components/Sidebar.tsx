@@ -54,10 +54,14 @@ export default function Sidebar({ active }: { active: string }) {
           <Home size={15} />
           Landing page
         </NavLink>
-        <NavLink to="/" className="sidebar-link">
+        <button
+          className="sidebar-link"
+          style={{ background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left' }}
+          onClick={() => { localStorage.clear(); window.location.href = '/'; }}
+        >
           <LogOut size={15} />
           Sign out
-        </NavLink>
+        </button>
       </div>
     </aside>
   );

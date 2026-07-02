@@ -10,7 +10,7 @@ module.exports = {
       name: 'vm-fleet-worker',
       script: 'src/fleet/worker.ts',
       interpreter: 'bun',
-      env: { NODE_ENV: 'development', VENDOR_ID: '1' },
+      env: { NODE_ENV: 'development', VENDOR_ID: '4' },
     },
     {
       name: 'vm-inbound-processor',
