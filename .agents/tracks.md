@@ -7,6 +7,7 @@
 ## Completed Tracks
 
 - [link-previews](tracks/link_previews_20260707/) — Link Previews (Open Graph Metadata): Added Open Graph and Twitter Card tags to index.html using the logo image for rich preview embeds.
+- [catalog-fuzzy-ingest](tracks/catalog_fuzzy_ingest_20260707/) — Fuzzy column detection for catalog Excel upload — any header format works now
 - [payments-upgrades](tracks/payments_upgrades_20260707/) — Nomba Payment & Top-up Dropdown Upgrades: URL normalization, Naira-to-Kobo amount scaling, and styled wallet top-up select dropdown.
 - [theme-and-filters](tracks/theme_and_filters_20260707/) — Theme Toggle & Orders Filters: global light/dark mode switch, filter pills text visibility bugfix, and PostgreSQL case-insensitive raw query fixes.
 - [frontend-redesign](tracks/frontend_redesign_20260706/) — Frontend Redesign: complete reconfiguration of landing, onboarding, sidebar, chat inbox, and catalog pages with new branding logos.

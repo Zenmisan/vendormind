@@ -77,13 +77,47 @@ const start = async () => {
     const items: any[] = XLSX.utils.sheet_to_json(sheet);
     const vendorId = BigInt(request.params.id);
 
-    const creations = items.map(item => ({
-      vendorId,
-      name: item.name || item.ProductName,
-      price: Number(item.price || item.Price),
-      description: item.description || item.Description || null,
-      stock: Number(item.stock || item.Stock || 0)
-    }));
+    if (items.length === 0) return reply.status(400).send({ error: 'Spreadsheet is empty' });
+
+    // Fuzzy column resolver — case-insensitive partial match
+    const keys = Object.keys(items[0]);
+    const find = (patterns: string[]) =>
+      keys.find(k => patterns.some(p => k.toLowerCase().includes(p))) ?? null;
+
+    const nameCol  = find(['name', 'product', 'item', 'title', 'cake', 'food', 'menu', 'service']);
+    const priceCol = find(['price', 'cost', 'amount', 'fee', 'rate', 'naira', 'charge']);
+    const descCol  = find(['desc', 'detail', 'note', 'about', 'whatnot', 'flavor', 'flavour', 'info', 'ingred', 'spec']);
+    const stockCol = find(['stock', 'qty', 'quantity', 'inventory', 'count', 'avail', 'units']);
+
+    // Columns not mapped to name/price/stock get concatenated into description
+    const usedCols = new Set([nameCol, priceCol, stockCol].filter(Boolean));
+    const extraDescCols = keys.filter(k => !usedCols.has(k) && k !== '#' && k !== 'id');
+
+    const creations = items
+      .map(item => {
+        const name = nameCol ? String(item[nameCol] ?? '').trim() : '';
+        if (!name) return null;
+
+        const explicitDesc = descCol ? String(item[descCol] ?? '').trim() : '';
+        const extraDesc = extraDescCols
+          .map(k => item[k] ? String(item[k]).trim() : '')
+          .filter(Boolean)
+          .join(' · ');
+        const description = [explicitDesc, !descCol && extraDesc ? extraDesc : '']
+          .filter(Boolean).join(' — ') || extraDesc || null;
+
+        return {
+          vendorId,
+          name,
+          price: priceCol ? Number(item[priceCol]) || 0 : 0,
+          description: description || null,
+          stock: stockCol ? Number(item[stockCol]) || 0 : 0,
+        };
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null);
+
+    if (creations.length === 0)
+      return reply.status(400).send({ error: `No valid rows found. Detected columns: ${keys.join(', ')}. Need at least a name/product column.` });
 
     await prisma.product.createMany({ data: creations, skipDuplicates: true });
 
