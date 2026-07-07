@@ -67,4 +67,4 @@ bun run scripts/verify.ts
 
 ## Implementation status
 
-See [STATUS.md](STATUS.md) for what's done and what's left.
+See [STATUS](docs/STATUS.md) for what's done and what's left.

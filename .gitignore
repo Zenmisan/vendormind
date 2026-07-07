@@ -44,4 +44,8 @@ id_ed25519*
 id_ecdsa*
 
 # Kiro agent
-.agnst
+.agents
+.kiro/
+
+# Root Copilot instructions
+/CLAUDE.md

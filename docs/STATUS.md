@@ -52,8 +52,6 @@
 - ✅ `context.service.ts`: wrong import path `'../shared/prisma/client'` → `'./prisma/client'`
 - ✅ `worker.ts`: hardcoded `vendorId: '1'` → `process.env.VENDOR_ID || '1'`
 
----
-
 ## Requires Manual Action
 
 | Action | Command / Note |
