@@ -138,33 +138,38 @@ async function startSock(vendorId: string) {
     for (const msg of m.messages) {
       if (msg.key.fromMe || !msg.message) continue;
 
-      const customerPhone = msg.key.remoteJid?.split('@')[0] || '';
+      const remoteJid = msg.key.remoteJid || '';
+
+      // Only handle personal DMs — skip groups, broadcasts, status, newsletters
+      if (!remoteJid.endsWith('@s.whatsapp.net')) continue;
+
+      const customerPhone = remoteJid.split('@')[0];
+      const customerName = msg.pushName?.trim() || undefined;
       const messageId = msg.key.id || '';
+      const ts = Number(msg.messageTimestamp) || Date.now();
       let jobData: InboundMessageJob | null = null;
 
       const text = extractMessageText(msg.message);
       if (text) {
-        jobData = { vendorId, customerPhone, messageId, type: 'text', content: text, timestamp: Number(msg.messageTimestamp) || Date.now() };
+        jobData = { vendorId, customerPhone, customerName, messageId, type: 'text', content: text, timestamp: ts };
       } else if (msg.message.locationMessage) {
         jobData = {
-          vendorId,
-          customerPhone,
-          messageId,
+          vendorId, customerPhone, customerName, messageId,
           type: 'location',
           location: {
             lat: msg.message.locationMessage.degreesLatitude!,
             lng: msg.message.locationMessage.degreesLongitude!
           },
-          timestamp: Number(msg.messageTimestamp) || Date.now()
+          timestamp: ts
         };
       } else if (msg.message.audioMessage) {
         console.log(`🎙️ [Vendor ${vendorId}] Voice note from ${customerPhone} — transcribing...`);
         const transcription = await transcribeAudio(msg);
         if (transcription) {
-          jobData = { vendorId, customerPhone, messageId, type: 'text', content: transcription, timestamp: Number(msg.messageTimestamp) || Date.now() };
+          jobData = { vendorId, customerPhone, customerName, messageId, type: 'text', content: transcription, timestamp: ts };
           console.log(`🎙️ Transcribed: "${transcription}"`);
         } else {
-          jobData = { vendorId, customerPhone, messageId, type: 'text', content: "[Voice note received but could not be transcribed. Please type your message.]", timestamp: Number(msg.messageTimestamp) || Date.now() };
+          jobData = { vendorId, customerPhone, customerName, messageId, type: 'text', content: "[Voice note received but could not be transcribed. Please type your message.]", timestamp: ts };
         }
       }
 
@@ -183,12 +188,25 @@ new Worker<OutboundMessageJob>(OUTBOUND_QUEUE, async (job) => {
   const { vendorId, remoteJid, content } = job.data;
   const sock = socketMap.get(vendorId);
   if (!sock) {
-    console.error(`📤 No active socket for vendor ${vendorId} — dropping outbound`);
-    return;
+    console.error(`📤 No active socket for vendor ${vendorId} — will retry`);
+    throw new Error(`No socket for vendor ${vendorId}`);
   }
-  console.log(`📤 [Vendor ${vendorId}] Sending to ${remoteJid}`);
-  await sock.sendMessage(remoteJid, { text: content });
-}, { connection: redisConnection });
+
+  const state = (sock as any).authState?.creds?.registered;
+  if (state === false) {
+    console.error(`📤 [Vendor ${vendorId}] Socket not authenticated — will retry`);
+    throw new Error(`Socket not authenticated for vendor ${vendorId}`);
+  }
+
+  try {
+    console.log(`📤 [Vendor ${vendorId}] Sending to ${remoteJid}: "${content.slice(0, 60)}..."`);
+    await sock.sendMessage(remoteJid, { text: content });
+    console.log(`✅ [Vendor ${vendorId}] Message delivered to ${remoteJid}`);
+  } catch (err: any) {
+    console.error(`❌ [Vendor ${vendorId}] sendMessage failed:`, err.message);
+    throw err; // let BullMQ retry
+  }
+}, { connection: redisConnection, concurrency: 5 });
 
 async function startAll() {
   const vendors = await prisma.vendor.findMany({ select: { id: true } });

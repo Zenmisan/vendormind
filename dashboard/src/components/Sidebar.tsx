@@ -70,6 +70,29 @@ export default function Sidebar({ active }: { active: string }) {
           <Settings size={15} />
           Settings
         </NavLink>
+
+        {/* Mobile-only: wallet + theme + sign-out in the nav row */}
+        <span className="sidebar-section-label sidebar-mobile-only">Account</span>
+        <NavLink to="/wallet" className={({ isActive }) => `sidebar-link sidebar-mobile-only${isActive ? ' active' : ''}`}>
+          <Wallet size={15} />
+          Wallet
+        </NavLink>
+        <button
+          className="sidebar-link sidebar-mobile-only"
+          style={{ background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left' }}
+          onClick={toggleTheme}
+        >
+          {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+          {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+        </button>
+        <button
+          className="sidebar-link sidebar-mobile-only"
+          style={{ background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left', color: '#ef4444' }}
+          onClick={() => signOut(auth).then(() => { window.location.href = '/'; })}
+        >
+          <LogOut size={15} />
+          Sign out
+        </button>
       </nav>
 
       <div className="sidebar-footer">

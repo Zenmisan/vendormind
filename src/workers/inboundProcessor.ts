@@ -13,7 +13,7 @@ const worker = new Worker<InboundMessageJob>(
   INBOUND_QUEUE,
   async (job) => {
     try {
-      const { vendorId, customerPhone, content, type, location } = job.data;
+      const { vendorId, customerPhone, customerName, content, type, location } = job.data;
       const vId = BigInt(vendorId);
 
       console.log(`Processing inbound message from ${customerPhone} for vendor ${vendorId}`);
@@ -80,13 +80,20 @@ const worker = new Worker<InboundMessageJob>(
         return;
       }
 
-      // 4. Identify / create customer
+      // 4. Identify / create customer — upsert name from WhatsApp pushName when available
+      const resolvedName = customerName || 'WhatsApp Customer';
       let customer = await prisma.customer.findUnique({
         where: { vendorId_phoneNumber: { vendorId: vId, phoneNumber: customerPhone } }
       });
       if (!customer) {
         customer = await prisma.customer.create({
-          data: { vendorId: vId, phoneNumber: customerPhone, name: 'WhatsApp Customer' }
+          data: { vendorId: vId, phoneNumber: customerPhone, name: resolvedName }
+        });
+      } else if (customerName && (customer.name === 'WhatsApp Customer' || !customer.name)) {
+        // Update name if we now have a real name and previously didn't
+        customer = await prisma.customer.update({
+          where: { id: customer.id },
+          data: { name: customerName }
         });
       }
 

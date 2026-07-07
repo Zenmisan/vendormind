@@ -710,7 +710,11 @@ body {
   overflow-x: auto;
 }
 
+/* sidebar-mobile-only: hidden on desktop, shown on mobile */
+.sidebar-mobile-only { display: none !important; }
+
 @media (max-width: 980px) {
+  .sidebar-mobile-only { display: flex !important; }
   .app-shell {
     flex-direction: column;
   }

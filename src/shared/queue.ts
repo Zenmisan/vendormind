@@ -37,6 +37,7 @@ export const embedQueue = new Queue(EMBED_QUEUE, defaultOptions);
 export interface InboundMessageJob {
   vendorId: string;
   customerPhone: string;
+  customerName?: string;
   messageId: string;
   type: 'text' | 'location' | 'audio';
   content?: string;
