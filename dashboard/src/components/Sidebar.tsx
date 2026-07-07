@@ -1,7 +1,8 @@
+import { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, LogOut, Package, PlugZap, Settings,
-  ShoppingBag, ShoppingCart, Wallet, MessageSquare
+  ShoppingBag, Wallet, MessageSquare, Sun, Moon
 } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../lib/firebase';
@@ -14,12 +15,30 @@ const nav = [
 ];
 
 export default function Sidebar({ active }: { active: string }) {
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem('theme') || 'dark';
+  });
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === 'dark') {
+      root.classList.add('dark');
+      root.setAttribute('data-theme', 'dark');
+    } else {
+      root.classList.remove('dark');
+      root.setAttribute('data-theme', 'light');
+    }
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+  };
+
   return (
     <aside className="sidebar">
       <div className="sidebar-logo">
-        <div className="sidebar-logo-icon">
-          <ShoppingCart size={15} color="#fff" />
-        </div>
+        <img src="/logo-dark.png" alt="VendorMind logo" style={{ width: 28, height: 28 }} />
         <span className="sidebar-logo-text">VendorMind</span>
       </div>
 
@@ -62,6 +81,14 @@ export default function Sidebar({ active }: { active: string }) {
           <Wallet size={15} />
           Balance & top up
         </NavLink>
+        <button
+          className="sidebar-link"
+          style={{ background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left' }}
+          onClick={toggleTheme}
+        >
+          {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+          {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+        </button>
         <button
           className="sidebar-link"
           style={{ background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left' }}

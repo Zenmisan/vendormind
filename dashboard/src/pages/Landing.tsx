@@ -1,3 +1,6 @@
+import { useState, useEffect, useRef } from 'react';
+import Lenis from 'lenis';
+import { useScrollReveal, useStaggerReveal } from '../lib/useScrollReveal';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   AlertCircle, Bot, Brain, Building2, CheckCircle, Clock3, CreditCard,
@@ -5,7 +8,7 @@ import {
   ShieldCheck, ShoppingBag, ShoppingCart, Sparkles, Store,
   WalletCards, ArrowRight, Zap,
 } from 'lucide-react';
-import { signInWithPopup } from 'firebase/auth';
+import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth, googleProvider } from '../lib/firebase';
 import { useAuth } from '../lib/AuthContext';
 
@@ -67,34 +70,111 @@ export default function Landing() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const signInWithGoogle = async () => {
+  const isDark = document.documentElement.classList.contains('dark');
+  const logoSrc = isDark ? '/logo-dark.png' : '/logo-light.png';
+
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authDestination, setAuthDestination] = useState<'/onboard' | '/dashboard'>('/onboard');
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState(false);
+
+  const [navScrolled, setNavScrolled] = useState(false);
+
+  // Lenis smooth scroll
+  useEffect(() => {
+    const lenis = new Lenis({ lerp: 0.08, duration: 1.2, smoothWheel: true });
+    const onScroll = ({ scroll }: { scroll: number }) => setNavScrolled(scroll > 60);
+    lenis.on('scroll', onScroll);
+    let raf: number;
+    const tick = (time: number) => { lenis.raf(time); raf = requestAnimationFrame(tick); };
+    raf = requestAnimationFrame(tick);
+    return () => { lenis.destroy(); cancelAnimationFrame(raf); };
+  }, []);
+
+  // Scroll-reveal refs
+  const statsRef    = useStaggerReveal();
+  const painRef     = useStaggerReveal();
+  const stepsRef    = useStaggerReveal();
+  const featuresRef = useStaggerReveal();
+  const pricingRef  = useScrollReveal();
+  const faqRef      = useStaggerReveal();
+  const audienceRef = useStaggerReveal();
+
+  const resetAuthForm = () => {
+    setEmail('');
+    setPassword('');
+    setAuthError(null);
+  };
+
+  const handleEmailAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim() || !password.trim()) return;
+    setAuthLoading(true);
+    setAuthError(null);
+    try {
+      if (isSignUp) {
+        await createUserWithEmailAndPassword(auth, email.trim(), password.trim());
+      } else {
+        await signInWithEmailAndPassword(auth, email.trim(), password.trim());
+      }
+      const hasVendor = !!localStorage.getItem('vendorId');
+      navigate(hasVendor ? '/dashboard' : authDestination);
+      setShowAuthModal(false);
+      resetAuthForm();
+    } catch (err: any) {
+      console.error('Email auth failed:', err.message);
+      setAuthError(err.message.replace('Firebase: ', ''));
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const signInWithGoogle = async (destination: '/onboard' | '/dashboard' = '/onboard') => {
     try {
       await signInWithPopup(auth, googleProvider);
-      navigate('/onboard');
+      const hasVendor = !!localStorage.getItem('vendorId');
+      navigate(hasVendor ? '/dashboard' : destination);
     } catch (err: any) {
       console.error('Google sign-in failed:', err.message);
     }
   };
 
   const handleGetStarted = () => {
-    if (user) navigate('/onboard');
-    else signInWithGoogle();
+    if (user) {
+      navigate(localStorage.getItem('vendorId') ? '/dashboard' : '/onboard');
+    } else {
+      setAuthDestination('/onboard');
+      setShowAuthModal(true);
+    }
+  };
+
+  const handleLogIn = () => {
+    if (user) {
+      navigate('/dashboard');
+    } else {
+      setAuthDestination('/dashboard');
+      setShowAuthModal(true);
+    }
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: '#fff', color: 'var(--text)', fontFamily: 'var(--font-sans)' }}>
+    <div className="app-shell" style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'var(--font-sans)' }}>
 
       {/* ── Nav ─────────────────────────────────────────────── */}
       <nav style={{
         position: 'sticky', top: 0, zIndex: 50,
-        background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(12px)',
-        borderBottom: '1px solid var(--border)',
+        background: navScrolled ? 'rgba(8,12,20,0.97)' : 'rgba(8,12,20,0.72)',
+        backdropFilter: `blur(${navScrolled ? 20 : 8}px)`,
+        borderBottom: `1px solid ${navScrolled ? 'rgba(255,255,255,0.08)' : 'transparent'}`,
+        transition: 'background 0.4s ease, backdrop-filter 0.4s ease, border-color 0.4s ease',
       }}>
         <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 1.5rem', height: 60, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <div style={{ width: 32, height: 32, background: 'var(--brand)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'var(--shadow-brand)' }}>
-              <ShoppingCart size={15} color="#fff" />
-            </div>
+            <img src={logoSrc} alt="VendorMind logo" style={{ width: 28, height: 28 }} />
             <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.05rem', letterSpacing: 0 }}>VendorMind</span>
           </div>
 
@@ -114,7 +194,7 @@ export default function Landing() {
                 Dashboard
               </button>
             ) : (
-              <button className="btn-ghost" onClick={signInWithGoogle} style={{ padding: '0.5rem 1.1rem', fontSize: '0.875rem', border: 'none' }}>
+              <button className="btn-ghost" onClick={handleLogIn} style={{ padding: '0.5rem 1.1rem', fontSize: '0.875rem', border: 'none' }}>
                 Log in
               </button>
             )}
@@ -144,9 +224,10 @@ export default function Landing() {
               fontWeight: 800, letterSpacing: 0, lineHeight: 1.08,
               margin: '0 0 1.25rem', color: 'var(--text)',
             }} className="landing-hero-title">
-              Turn WhatsApp<br />
-              chats into<br />
-              <span style={{ color: 'var(--brand)' }}>paid orders</span>
+              {['Turn', 'WhatsApp', 'chats', 'into'].map((w, i) => (
+                <span key={w} className="hero-word" style={{ animationDelay: `${i * 80}ms`, marginRight: '0.25em' }}>{w}</span>
+              ))}<br />
+              <span className="hero-word" style={{ animationDelay: '320ms', color: 'var(--brand)' }}>paid orders</span>
             </h1>
 
             <p style={{ fontSize: '1.05rem', color: 'var(--text-2)', lineHeight: 1.65, margin: '0 0 2rem', maxWidth: 440 }}>
@@ -171,24 +252,25 @@ export default function Landing() {
 
           {/* Chat mockup */}
           <div className="animate-fade-up-2" style={{ display: 'flex', justifyContent: 'center' }}>
-            <div style={{
-              width: 320, background: '#fff', borderRadius: 20,
-              boxShadow: '0 24px 64px rgba(0,0,0,0.12), 0 4px 16px rgba(0,0,0,0.06)',
+            <div className="landing-chat-mockup" style={{
+              background: 'var(--surface)', borderRadius: 20,
+              border: '1px solid var(--border)',
+              boxShadow: '0 24px 64px rgba(0,0,0,0.48), 0 4px 16px rgba(0,0,0,0.16)',
               overflow: 'hidden',
             }}>
               {/* Chat header */}
               <div style={{ background: 'var(--brand)', padding: '0.875rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <div style={{ width: 36, height: 36, background: 'rgba(255,255,255,0.2)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Bot size={17} color="#fff" />
+                <div style={{ width: 36, height: 36, background: 'rgba(0,0,0,0.15)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Bot size={17} color="var(--brand)" />
                 </div>
                 <div>
-                  <p style={{ fontWeight: 600, fontSize: '0.875rem', color: '#fff', margin: 0 }}>Mama Cee's Kitchen</p>
-                  <p style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.75)', margin: 0 }}>AI Sales Agent • Online</p>
+                  <p style={{ fontWeight: 600, fontSize: '0.875rem', color: '#05080e', margin: 0 }}>Mama Cee's Kitchen</p>
+                  <p style={{ fontSize: '0.72rem', color: 'rgba(5,8,14,0.7)', margin: 0 }}>AI Sales Agent • Online</p>
                 </div>
               </div>
 
               {/* Messages */}
-              <div style={{ background: '#f0f2f5', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div style={{ background: 'var(--bg)', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {[
                   { me: true,  text: 'Hi! Do you have jollof rice?' },
                   { me: false, text: 'Yes! Party Jollof Rice (₦2,500) and Small Chops Combo (₦3,000). Want to add any to your cart?' },
@@ -213,7 +295,7 @@ export default function Landing() {
 
       {/* ── Stats ───────────────────────────────────────────── */}
       <section style={{ background: 'var(--sidebar-bg)', padding: '3.5rem 1.5rem' }}>
-        <div className="landing-signal-grid" style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '2rem', textAlign: 'center' }}>
+        <div ref={statsRef} className="landing-signal-grid stagger-container" style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '2rem', textAlign: 'center' }}>
           {launchSignals.map(s => (
             <div key={s.label}>
               <p className="display" style={{ fontSize: '2rem', fontWeight: 800, color: '#4ade80', margin: 0, letterSpacing: 0 }}>{s.value}</p>
@@ -239,7 +321,7 @@ export default function Landing() {
               fulfilment, and customer relationships.
             </p>
           </div>
-          <div style={{ display: 'grid', gap: '1rem' }}>
+          <div ref={painRef} className="stagger-container" style={{ display: 'grid', gap: '1rem' }}>
             {painPoints.map(({ Icon, title, desc }) => (
               <div key={title} className="card" style={{ padding: '1.25rem', display: 'grid', gridTemplateColumns: '42px 1fr', gap: '1rem', alignItems: 'start' }}>
                 <div style={{ width: 42, height: 42, borderRadius: 12, background: 'rgba(22,163,74,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -266,7 +348,7 @@ export default function Landing() {
               If customers ask questions before they buy, VendorMind can help manage that conversation.
             </p>
           </div>
-          <div className="landing-audience-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.75rem' }}>
+          <div ref={audienceRef} className="landing-audience-grid stagger-container" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.75rem' }}>
             {audiences.map((audience, i) => (
               <div key={audience} className="card" style={{ padding: '1rem', minHeight: 96, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                 <Store size={18} color={i % 2 === 0 ? 'var(--brand)' : '#3b82f6'} />
@@ -285,7 +367,7 @@ export default function Landing() {
           </h2>
           <p style={{ fontSize: '0.95rem', color: 'var(--text-2)', margin: 0 }}>No developers needed. Upload your products, connect WhatsApp, and start taking orders.</p>
         </div>
-        <div className="landing-three-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '1.25rem' }}>
+        <div ref={stepsRef} className="landing-three-grid stagger-container" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '1.25rem' }}>
           {steps.map((s, i) => (
             <div key={s.n} className="card" style={{ padding: '1.75rem', position: 'relative', overflow: 'hidden' }}>
               <span style={{
@@ -336,7 +418,7 @@ export default function Landing() {
           <div className="dashboard-preview">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
               <div>
-                <p style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1rem', margin: 0, color: '#0d1117' }}>Today at a glance</p>
+                <p style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1rem', margin: 0, color: 'var(--text)' }}>Today at a glance</p>
                 <p style={{ fontSize: '0.74rem', color: 'var(--text-3)', margin: '0.2rem 0 0' }}>Store operations preview</p>
               </div>
               <span className="badge" style={{ background: 'rgba(22,163,74,0.1)', color: 'var(--brand)' }}>
@@ -351,9 +433,9 @@ export default function Landing() {
                 { Icon: FileSpreadsheet, label: 'Catalog items', value: '248', color: '#f59e0b' },
                 { Icon: ShieldCheck, label: 'Wallet status', value: 'Healthy', color: '#14b8a6' },
               ].map(({ Icon, label, value, color }) => (
-                <div key={label} style={{ border: '1px solid var(--border)', borderRadius: 12, padding: '1rem', background: '#fff' }}>
+                <div key={label} style={{ border: '1px solid var(--border)', borderRadius: 12, padding: '1rem', background: 'var(--surface-raised)' }}>
                   <Icon size={17} color={color} />
-                  <p className="display" style={{ fontSize: '1.35rem', fontWeight: 800, margin: '0.65rem 0 0.15rem', color: '#0d1117' }}>{value}</p>
+                  <p className="display" style={{ fontSize: '1.35rem', fontWeight: 800, margin: '0.65rem 0 0.15rem', color: 'var(--text)' }}>{value}</p>
                   <p style={{ fontSize: '0.72rem', color: 'var(--text-3)', margin: 0 }}>{label}</p>
                 </div>
               ))}
@@ -364,10 +446,10 @@ export default function Landing() {
                 ['Small Chops Combo', '₦3,000', '18 left'],
                 ['Chapman Bottle', '₦1,200', '31 left'],
               ].map(([name, price, stock]) => (
-                <div key={name} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '1rem', padding: '0.85rem 1rem', borderBottom: name === 'Chapman Bottle' ? 'none' : '1px solid var(--border-subtle)', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0d1117' }}>{name}</span>
+                <div key={name} className="landing-preview-row" style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '0.75rem', padding: '0.85rem 1rem', borderBottom: name === 'Chapman Bottle' ? 'none' : '1px solid var(--border-subtle)', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text)' }}>{name}</span>
                   <span className="mono" style={{ fontSize: '0.8rem', color: 'var(--text-2)' }}>{price}</span>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--brand)', fontWeight: 700 }}>{stock}</span>
+                  <span className="landing-preview-stock" style={{ fontSize: '0.72rem', color: 'var(--brand)', fontWeight: 700 }}>{stock}</span>
                 </div>
               ))}
             </div>
@@ -384,7 +466,7 @@ export default function Landing() {
             </h2>
             <p style={{ fontSize: '0.95rem', color: 'var(--text-2)', margin: 0 }}>The pieces your WhatsApp store needs to answer, sell, collect payment, and keep context.</p>
           </div>
-          <div className="landing-three-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '1rem' }}>
+          <div ref={featuresRef} className="landing-three-grid stagger-container" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '1rem' }}>
             {features.map(({ Icon, title, desc, color, bg }) => (
               <div key={title} className="feature-card">
                 <div style={{ width: 42, height: 42, borderRadius: 12, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1rem' }}>
@@ -406,7 +488,7 @@ export default function Landing() {
           </h2>
           <p style={{ fontSize: '0.95rem', color: 'var(--text-2)', margin: 0 }}>No monthly fees. No contracts. Pay only for what you use.</p>
         </div>
-        <div style={{ maxWidth: 420, margin: '0 auto' }}>
+        <div ref={pricingRef} className="reveal-block" style={{ maxWidth: 420, margin: '0 auto' }}>
           <div className="pricing-card">
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
               <div>
@@ -451,7 +533,7 @@ export default function Landing() {
               The basics before connecting your store.
             </p>
           </div>
-          <div style={{ display: 'grid', gap: '0.75rem' }}>
+          <div ref={faqRef} className="stagger-container" style={{ display: 'grid', gap: '0.75rem' }}>
             {faqs.map(([q, a]) => (
               <details key={q} className="faq-item">
                 <summary>{q}</summary>
@@ -482,9 +564,7 @@ export default function Landing() {
       <footer style={{ background: '#08090d', padding: '1.75rem 1.5rem' }}>
         <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <div style={{ width: 24, height: 24, background: 'var(--brand)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <ShoppingCart size={11} color="#fff" />
-            </div>
+            <img src={logoSrc} alt="VendorMind logo" style={{ width: 20, height: 20 }} />
             <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.875rem', color: 'rgba(255,255,255,0.5)', letterSpacing: 0 }}>VendorMind</span>
           </div>
           <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.2)', margin: 0 }}>© 2026 VendorMind. Built for Nigerian vendors.</p>
@@ -495,6 +575,136 @@ export default function Landing() {
           </div>
         </div>
       </footer>
+
+      {/* ── Auth Confirmation Modal ──────────────────────────── */}
+      {showAuthModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(5, 8, 14, 0.85)', backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 100, padding: '1rem',
+          animation: 'fadeIn 0.2s ease-out'
+        }}>
+          <div className="card-raised animate-scale-up" style={{
+            maxWidth: 400, width: '100%', padding: '2rem',
+            textAlign: 'center', display: 'flex', flexDirection: 'column',
+            alignItems: 'center', gap: '1.15rem', border: '1px solid var(--border)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+              <img src={logoSrc} alt="VendorMind logo" style={{ width: 32, height: 32 }} />
+              <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.2rem', color: 'var(--text)' }}>VendorMind</span>
+            </div>
+
+            <div>
+              <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', fontWeight: 800, margin: '0 0 0.35rem', color: 'var(--text)' }}>
+                {isSignUp ? 'Create your account' : 'Sign in to your store'}
+              </h3>
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-3)', lineHeight: 1.5, margin: 0 }}>
+                Get instant access to your WhatsApp sales agent dashboard.
+              </p>
+            </div>
+
+            {/* Google OAuth Option */}
+            <div style={{ width: '100%' }}>
+              <button
+                className="btn-primary"
+                onClick={() => {
+                  setShowAuthModal(false);
+                  signInWithGoogle(authDestination);
+                }}
+                style={{ width: '100%', padding: '0.75rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+              >
+                Continue with Google
+              </button>
+            </div>
+
+            {/* Divider */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', width: '100%', margin: '0.1rem 0' }}>
+              <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-3)', fontWeight: 600, textTransform: 'uppercase' }}>or</span>
+              <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+            </div>
+
+            {/* Email/Password Auth Form */}
+            <form onSubmit={handleEmailAuth} style={{ display: 'grid', gap: '0.75rem', width: '100%', textAlign: 'left' }}>
+              <label style={{ display: 'grid', gap: '0.3rem', fontSize: '0.72rem', color: 'var(--text-2)', fontWeight: 700 }}>
+                Email address
+                <input
+                  type="email"
+                  required
+                  className="input"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="name@store.com"
+                  style={{ padding: '0.6rem 0.75rem', fontSize: '0.82rem' }}
+                />
+              </label>
+              <label style={{ display: 'grid', gap: '0.3rem', fontSize: '0.72rem', color: 'var(--text-2)', fontWeight: 700 }}>
+                Password
+                <input
+                  type="password"
+                  required
+                  className="input"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  style={{ padding: '0.6rem 0.75rem', fontSize: '0.82rem' }}
+                />
+              </label>
+
+              {authError && (
+                <p style={{ margin: 0, fontSize: '0.74rem', color: '#ef4444', lineHeight: 1.4 }}>
+                  {authError}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                className="btn-primary"
+                disabled={authLoading}
+                style={{ padding: '0.75rem', fontSize: '0.85rem', marginTop: '0.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                {authLoading ? (
+                  <Loader2 size={14} style={{ animation: 'spin-slow 1s linear infinite' }} />
+                ) : isSignUp ? (
+                  'Create Account with Email'
+                ) : (
+                  'Sign In with Email'
+                )}
+              </button>
+            </form>
+
+            {/* Toggle Sign Up / Sign In */}
+            <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-3)' }}>
+              {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSignUp(!isSignUp);
+                  setAuthError(null);
+                }}
+                style={{ background: 'none', border: 'none', color: 'var(--brand)', cursor: 'pointer', fontWeight: 700, padding: 0 }}
+              >
+                {isSignUp ? 'Sign in' : 'Sign up'}
+              </button>
+            </p>
+
+            <div style={{ width: '100%', borderTop: '1px solid var(--border)', paddingTop: '0.75rem' }}>
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={() => {
+                  setShowAuthModal(false);
+                  resetAuthForm();
+                }}
+                style={{ padding: '0.7rem', fontSize: '0.85rem', width: '100%', border: 'none' }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

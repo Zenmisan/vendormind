@@ -43,7 +43,7 @@
 }
 
 /* ── Dark Mode Scope for Console ────────────────────────────── */
-.app-shell {
+html.dark .app-shell {
   --brand: #4ade80;
   --brand-hover: #22c55e;
   --brand-glow: rgba(74, 222, 128, 0.14);
@@ -72,7 +72,9 @@
   --shadow-md: 0 10px 15px rgba(0, 0, 0, 0.4), 0 4px 6px rgba(0, 0, 0, 0.3);
   --shadow-lg: 0 20px 25px rgba(0, 0, 0, 0.5), 0 10px 10px rgba(0, 0, 0, 0.4);
   --shadow-brand: 0 0 16px rgba(74, 222, 128, 0.2);
-  
+}
+
+.app-shell {
   background: var(--bg);
   background-image:
     radial-gradient(at 0% 0%, rgba(74, 222, 128, 0.06) 0px, transparent 50%),
@@ -81,67 +83,67 @@
 }
 
 /* Overrides for elements inside the dark app shell */
-.app-shell .btn-primary {
+html.dark .app-shell .btn-primary {
   color: #05080e !important;
   background: var(--brand) !important;
   font-weight: 700 !important;
   box-shadow: 0 4px 14px rgba(74, 222, 128, 0.3) !important;
 }
-.app-shell .btn-primary:hover:not(:disabled) {
+html.dark .app-shell .btn-primary:hover:not(:disabled) {
   background: var(--brand-hover) !important;
   box-shadow: 0 6px 20px rgba(74, 222, 128, 0.45) !important;
 }
 
-.app-shell .btn-ghost {
+html.dark .app-shell .btn-ghost {
   background: transparent !important;
   border: 1px solid var(--border) !important;
   color: var(--text) !important;
 }
-.app-shell .btn-ghost:hover {
+html.dark .app-shell .btn-ghost:hover {
   background: var(--surface-raised) !important;
   border-color: rgba(74, 222, 128, 0.2) !important;
   color: var(--text) !important;
 }
 
-.app-shell .input {
+html.dark .app-shell .input {
   background: #0f1624 !important;
   color: var(--text) !important;
   border: 1px solid var(--border) !important;
 }
-.app-shell .input:focus {
+html.dark .app-shell .input:focus {
   border-color: var(--brand) !important;
   box-shadow: 0 0 0 3px var(--brand-glow) !important;
 }
 
-.app-shell .success-panel {
+html.dark .app-shell .success-panel {
   background: rgba(74, 222, 128, 0.06) !important;
   border: 1px solid rgba(74, 222, 128, 0.15) !important;
 }
-.app-shell .success-panel p {
+html.dark .app-shell .success-panel p {
   color: var(--brand) !important;
 }
-.app-shell .success-panel span {
+html.dark .app-shell .success-panel span {
   color: var(--text-2) !important;
 }
 
-.app-shell .skeleton {
+html.dark .app-shell .skeleton {
   background: linear-gradient(90deg, #16222f 25%, #1f2d3d 37%, #16222f 63%) !important;
   background-size: 400px 100% !important;
 }
 
-.app-shell .upload-dropzone {
+html.dark .app-shell .upload-dropzone {
   border-color: var(--border) !important;
   background: rgba(255, 255, 255, 0.02) !important;
 }
-.app-shell .upload-dropzone:hover {
+html.dark .app-shell .upload-dropzone:hover {
   border-color: var(--brand) !important;
   background: rgba(74, 222, 128, 0.04) !important;
 }
-.app-shell .upload-dropzone p {
+html.dark .app-shell .upload-dropzone p {
   color: var(--text) !important;
 }
 
-.app-shell .data-table tbody tr:hover td {
+html.dark .app-shell .data-table tbody tr:hover td {
   background: rgba(74, 222, 128, 0.04) !important;
   color: var(--text) !important;
 }
@@ -318,6 +320,20 @@ body {
   overflow: hidden;
   transition: box-shadow 0.2s, transform 0.2s;
 }
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--brand), transparent);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.stat-card:hover::before {
+  opacity: 1;
+}
 .stat-card:hover {
   box-shadow: var(--shadow-md);
   transform: translateY(-1px);
@@ -426,6 +442,47 @@ body {
 .animate-fade-up-3 { animation: fadeUp 0.4s 0.15s ease both; }
 .animate-fade-up-4 { animation: fadeUp 0.4s 0.2s ease both; }
 .animate-fade-up-5 { animation: fadeUp 0.4s 0.25s ease both; }
+
+/* ── Scroll-reveal (Lenis driven) ─────────────────────── */
+.reveal-block {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.65s cubic-bezier(0.22, 1, 0.36, 1),
+              transform 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.reveal-block.reveal-in {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Stagger container: children slide up with cascade delay */
+.stagger-container > * {
+  opacity: 0;
+  transform: translateY(32px);
+  transition: opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1) var(--stagger-delay, 0ms),
+              transform 0.6s cubic-bezier(0.22, 1, 0.36, 1) var(--stagger-delay, 0ms);
+}
+.stagger-container.stagger-in > * {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Hero word-by-word reveal */
+.hero-word {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(20px);
+  animation: heroWordIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes heroWordIn {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal-block, .stagger-container > *, .hero-word {
+    opacity: 1 !important; transform: none !important; transition: none !important; animation: none !important;
+  }
+}
 
 .skeleton {
   background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 37%, #f0f0f0 63%);
@@ -644,9 +701,9 @@ body {
   color: var(--text-2);
 }
 .filter-pill.active {
-  background: var(--text);
-  border-color: var(--text);
-  color: #fff;
+  background: var(--brand);
+  border-color: var(--brand);
+  color: var(--bg);
 }
 .table-scroll {
   width: 100%;
@@ -706,36 +763,80 @@ body {
   }
 }
 
+/* ── Landing responsive ─────────────────────────────────────── */
+
+/* Prevent horizontal overflow from any fixed-width child */
+html, body { overflow-x: hidden; }
+* { min-width: 0; }
+
+/* Chat mockup: never wider than its container */
+.landing-chat-mockup {
+  width: min(320px, 100%);
+  max-width: 100%;
+}
+
 @media (max-width: 900px) {
   .landing-nav-links { display: none; }
+  .landing-nav-actions { gap: 0.875rem; }
+
   .landing-hero-grid,
   .landing-split {
     grid-template-columns: 1fr !important;
-    gap: 2rem !important;
+    gap: 2.5rem !important;
   }
+  /* hero copy comes first visually on mobile */
+  .landing-hero-grid > *:last-child { order: 2; }
+
   .landing-hero-title { font-size: 2.65rem; }
+
+  /* 3-col on tablet for audience/steps/features */
+  .landing-audience-grid { grid-template-columns: repeat(3, 1fr) !important; }
+  .landing-three-grid    { grid-template-columns: repeat(2, 1fr) !important; }
+  .landing-signal-grid   { grid-template-columns: repeat(2, 1fr) !important; }
+
+  .dashboard-preview-grid { grid-template-columns: repeat(2, 1fr); }
+
+  /* reduce section vertical padding on tablet */
+  .landing-section-pad { padding-top: 3.5rem !important; padding-bottom: 3.5rem !important; }
+}
+
+@media (max-width: 640px) {
+  .landing-nav-actions { gap: 0.5rem; }
+  .landing-nav-actions .btn-primary { display: none; }
+  .landing-hero-title { font-size: 2.1rem; }
+
   .landing-signal-grid,
-  .landing-audience-grid,
   .landing-three-grid {
     grid-template-columns: repeat(2, 1fr) !important;
   }
-  .dashboard-preview-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
+  .landing-audience-grid { grid-template-columns: repeat(2, 1fr) !important; }
+
+  /* tighten section padding on small phones */
+  section[style] { padding-left: 1rem !important; padding-right: 1rem !important; }
 }
 
-@media (max-width: 560px) {
-  html { font-size: 14px; }
-  .landing-nav-actions .btn-primary { display: none; }
-  .landing-hero-title { font-size: 2.25rem; }
+@media (max-width: 420px) {
+  html { font-size: 13.5px; }
+  .landing-hero-title { font-size: 1.9rem; }
+
   .landing-signal-grid,
   .landing-audience-grid,
   .landing-three-grid {
     grid-template-columns: 1fr !important;
   }
-  .dashboard-preview {
-    padding: 1rem;
-    border-radius: var(--radius-lg);
+
+  .dashboard-preview-grid { grid-template-columns: repeat(2, 1fr); }
+  .dashboard-preview { padding: 0.875rem; }
+
+  /* preview mini-table: drop stock column on tiny */
+  .landing-preview-row { grid-template-columns: 1fr auto !important; }
+  .landing-preview-stock { display: none; }
+
+  section[style] {
+    padding-top: 3rem !important;
+    padding-bottom: 3rem !important;
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
   }
 }
 
@@ -757,4 +858,26 @@ body {
   align-items: center;
   justify-content: center;
   margin-bottom: 1rem;
+}
+
+/* ── Landing page dark overrides inside app-shell ─────────────── */
+.app-shell .hero-gradient {
+  background:
+    radial-gradient(ellipse 80% 60% at 50% -20%, rgba(74, 222, 128, 0.12) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 40% at 80% 20%, rgba(34, 197, 94, 0.07) 0%, transparent 50%),
+    var(--bg) !important;
+}
+
+.app-shell .chat-bubble-bot {
+  background: var(--surface-raised) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border) !important;
+}
+
+.app-shell .dashboard-preview {
+  background: var(--surface) !important;
+}
+
+.app-shell .dashboard-preview * {
+  border-color: var(--border) !important;
 }

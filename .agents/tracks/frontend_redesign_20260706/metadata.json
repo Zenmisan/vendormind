@@ -1,0 +1,26 @@
+{
+  "id": "frontend_redesign_20260706",
+  "title": "VendorMind Frontend Redesign",
+  "type": "feature",
+  "status": "completed",
+  "priority": "high",
+  "created": "2026-07-06T23:53:00Z",
+  "updated": "2026-07-07T00:25:00Z",
+  "started": "2026-07-06T23:53:00Z",
+  "completed": "2026-07-07T00:25:00Z",
+  "assignee": "@developer",
+  "phases": {
+    "total": 3,
+    "current": 3,
+    "completed": 3
+  },
+  "tasks": {
+    "total": 10,
+    "completed": 10,
+    "in_progress": 0,
+    "pending": 0
+  },
+  "checkpoints": [],
+  "dependencies": [],
+  "tags": ["frontend", "design", "ui", "ux"]
+}

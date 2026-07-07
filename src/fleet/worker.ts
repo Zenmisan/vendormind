@@ -15,7 +15,8 @@ import { prisma } from '../shared/prisma/client';
 const logger = pino({ level: 'silent' });
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-const VENDOR_ID = process.env.VENDOR_ID || '1';
+// socketMap tracks active sockets per vendor so we never double-start
+const socketMap = new Map<string, ReturnType<typeof makeWASocket>>();
 
 async function transcribeAudio(msg: any): Promise<string | null> {
   try {
@@ -33,7 +34,8 @@ async function transcribeAudio(msg: any): Promise<string | null> {
   }
 }
 
-async function startSock(vendorId: string = VENDOR_ID) {
+async function startSock(vendorId: string) {
+  if (socketMap.has(vendorId)) return;
   const { state, saveCreds } = await usePrismaAuthState(vendorId);
   const { version, isLatest } = await fetchLatestBaileysVersion();
   const vId = BigInt(vendorId);
@@ -57,6 +59,7 @@ async function startSock(vendorId: string = VENDOR_ID) {
     getMessage: async (_key) => ({ conversation: '' }),
   });
 
+  socketMap.set(vendorId, sock);
   sock.ev.on('creds.update', saveCreds);
 
   sock.ev.on('connection.update', async (update) => {
@@ -88,11 +91,21 @@ async function startSock(vendorId: string = VENDOR_ID) {
     }
 
     if (connection === 'close') {
+      socketMap.delete(vendorId);
       const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
+
+      // Always mark as disconnected so the portal reflects reality immediately
+      await prisma.whatsAppSession.upsert({
+        where: { sessionId: `${vendorId}:qr` },
+        update: { data: { connected: false }, updatedAt: new Date() },
+        create: { vendorId: vId, sessionId: `${vendorId}:qr`, data: { connected: false } },
+      }).catch(() => {});
+
       if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
         console.log(`[Vendor ${vendorId}] Logged out — clearing session`);
         await prisma.whatsAppSession.deleteMany({ where: { vendorId: vId } });
       } else if (statusCode !== 440) {
+        console.log(`[Vendor ${vendorId}] Disconnected (${statusCode}) — reconnecting...`);
         const delay = Math.min(5000 * (2 ** Math.min(sock.ev.listenerCount('connection.update'), 4)), 60000);
         setTimeout(() => startSock(vendorId), delay);
       }
@@ -149,14 +162,41 @@ async function startSock(vendorId: string = VENDOR_ID) {
     }
   });
 
-  // Outbound sender
-  new Worker<OutboundMessageJob>(OUTBOUND_QUEUE, async (job) => {
-    const { remoteJid, content } = job.data;
-    console.log(`📤 [Vendor ${vendorId}] Sending to ${remoteJid}`);
-    await sock.sendMessage(remoteJid, { text: content });
-  }, { connection: redisConnection });
-
   return sock;
 }
 
-startSock().catch(err => console.error('Failed to start socket:', err));
+// Single outbound worker shared across all vendors — routes via socketMap
+new Worker<OutboundMessageJob>(OUTBOUND_QUEUE, async (job) => {
+  const { vendorId, remoteJid, content } = job.data;
+  const sock = socketMap.get(vendorId);
+  if (!sock) {
+    console.error(`📤 No active socket for vendor ${vendorId} — dropping outbound`);
+    return;
+  }
+  console.log(`📤 [Vendor ${vendorId}] Sending to ${remoteJid}`);
+  await sock.sendMessage(remoteJid, { text: content });
+}, { connection: redisConnection });
+
+async function startAll() {
+  const vendors = await prisma.vendor.findMany({ select: { id: true } });
+  console.log(`🚀 Fleet starting sockets for ${vendors.length} vendor(s)`);
+  await Promise.allSettled(vendors.map(v => startSock(v.id.toString())));
+}
+
+// Pick up new vendors registered after startup (polls every 60s)
+setInterval(async () => {
+  try {
+    const vendors = await prisma.vendor.findMany({ select: { id: true } });
+    for (const v of vendors) {
+      const vid = v.id.toString();
+      if (!socketMap.has(vid)) {
+        console.log(`🆕 New vendor detected: ${vid} — starting socket`);
+        startSock(vid).catch(console.error);
+      }
+    }
+  } catch (err) {
+    console.error('Fleet poll error:', err);
+  }
+}, 60_000);
+
+startAll().catch(err => console.error('Fleet startup failed:', err));

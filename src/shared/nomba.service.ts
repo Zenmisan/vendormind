@@ -1,6 +1,12 @@
 import { createHmac } from 'crypto';
 
-const BASE = process.env.NOMBA_BASE_URL || 'https://api.nomba.com';
+let BASE = process.env.NOMBA_BASE_URL || 'https://api.nomba.com';
+if (BASE.endsWith('/v1')) {
+  BASE = BASE.slice(0, -3);
+} else if (BASE.endsWith('/v1/')) {
+  BASE = BASE.slice(0, -4);
+}
+
 const CLIENT_ID = () => process.env.NOMBA_CLIENT_ID || '';
 const CLIENT_SECRET = () => process.env.NOMBA_CLIENT_SECRET || '';
 const ACCOUNT_ID = () => process.env.NOMBA_ACCOUNT_ID || '';
@@ -33,10 +39,11 @@ async function getAccessToken(): Promise<string> {
 
   if (!res.ok) throw new Error(`Nomba auth failed: ${await res.text()}`);
   const body = await res.json() as any;
-  const token = body.access_token as string;
-  const expiresIn = (body.expires_in ?? 1800) as number;
+  const token = body.data?.access_token as string;
+  if (!token) throw new Error(`No access token returned in data object: ${JSON.stringify(body)}`);
+  const expiresAt = body.data?.expiresAt ? new Date(body.data.expiresAt).getTime() : Date.now() + 1800 * 1000;
 
-  tokenCache = { token, expiresAt: Date.now() + expiresIn * 1000 };
+  tokenCache = { token, expiresAt };
   return token;
 }
 
@@ -69,7 +76,7 @@ export class NombaService {
       headers: authHeaders(token),
       body: JSON.stringify({
         order: {
-          amount: params.amountNGN.toFixed(2),
+          amount: (params.amountNGN * 100).toFixed(2),
           currency: 'NGN',
           orderReference: params.orderReference,
           callbackUrl: params.callbackUrl,

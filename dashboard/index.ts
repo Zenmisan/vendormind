@@ -1,11 +1,14 @@
 import index from './index.html';
+import { join } from 'path';
 
 const PORT = Number(process.env.DASHBOARD_PORT) || 5173;
+const PUBLIC_DIR = join(import.meta.dir, 'public');
 
 Bun.serve({
   port: PORT,
   routes: {
-    // SPA — serve the same HTML for all routes, React Router handles navigation
+    '/logo-light.png': () => new Response(Bun.file(join(PUBLIC_DIR, 'logo-light.png'))),
+    '/logo-dark.png': () => new Response(Bun.file(join(PUBLIC_DIR, 'logo-dark.png'))),
     '/*': index,
   },
   development: {

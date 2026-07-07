@@ -25,6 +25,31 @@ const worker = new Worker<InboundMessageJob>(
         return;
       }
 
+      // 1.1 Onboarding Gate: block if catalog has <80% products embedded (only if OpenAI key is configured)
+      const hasOpenAI = !!(process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY.includes('...'));
+      if (hasOpenAI) {
+        const totalProducts = await prisma.product.count({ where: { vendorId: vId } });
+        if (totalProducts > 0) {
+          const embeddedResult = await prisma.$queryRaw<Array<{ count: bigint }>>`
+            SELECT COUNT(*)::bigint as count
+            FROM products
+            WHERE "vendorId" = ${vId}
+              AND embedding IS NOT NULL
+          `;
+          const embedded = Number(embeddedResult[0]?.count || 0);
+          const progress = (embedded / totalProducts) * 100;
+          if (progress < 80.0) {
+            console.warn(`🛑 Vendor ${vendorId} blocked by Onboarding Gate: ${progress.toFixed(1)}% embedded`);
+            await outboundQueue.add(`catalog-indexing-block:${job.id}`, {
+              vendorId,
+              remoteJid: `${customerPhone}@s.whatsapp.net`,
+              content: "We are currently preparing our store catalog for the AI assistant. Please try again in a few minutes!"
+            });
+            return;
+          }
+        }
+      }
+
       // 2. Wallet check
       const billing = await BillingService.canProcess(vId);
       if (!billing.allowed) {

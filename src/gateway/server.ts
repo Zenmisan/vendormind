@@ -8,6 +8,7 @@ import { prisma } from '../shared/prisma/client';
 import { inboundQueue, outboundQueue, embedQueue, EmbedProductJob } from '../shared/queue';
 import { NombaService } from '../shared/nomba.service';
 import { redisConnection } from '../shared/redis';
+import { ContextService } from '../shared/context.service';
 
 const fastify = Fastify({
   logger: {
@@ -104,6 +105,7 @@ const start = async () => {
   });
 
   // ── Wallet Top-up ─────────────────────────────────────────────────
+  // Legacy direct topup (dev/mock only — no Nomba credentials)
   fastify.post<{ Body: { vendorId: string; amount: number } }>('/topup', async (request) => {
     const { vendorId, amount } = request.body;
     const vendor = await prisma.vendor.update({
@@ -111,6 +113,66 @@ const start = async () => {
       data: { walletBalance: { increment: amount } }
     });
     return { newBalance: Number(vendor.walletBalance) };
+  });
+
+  // ── Wallet Top-up via Nomba Checkout ──────────────────────────────
+  fastify.post<{ Params: { id: string }; Body: { amount: number } }>('/vendors/:id/wallet/topup', async (request, reply) => {
+    let vendorId: bigint;
+    try { vendorId = BigInt(request.params.id); }
+    catch { return reply.status(400).send({ error: 'Invalid vendor ID' }); }
+
+    const { amount } = request.body;
+    if (!amount || amount <= 0) return reply.status(400).send({ error: 'Invalid amount' });
+
+    const vendor = await prisma.vendor.findUnique({ where: { id: vendorId }, select: { email: true } });
+    if (!vendor) return reply.status(404).send({ error: 'Vendor not found' });
+
+    const nombaConfigured = !!(process.env.NOMBA_CLIENT_ID && process.env.NOMBA_CLIENT_SECRET && process.env.NOMBA_ACCOUNT_ID);
+
+    if (!nombaConfigured) {
+      // Dev fallback: direct credit
+      const updated = await prisma.vendor.update({
+        where: { id: vendorId },
+        data: { walletBalance: { increment: amount } }
+      });
+      return { mode: 'mock', newBalance: Number(updated.walletBalance) };
+    }
+
+    const orderReference = `TOPUP-${request.params.id}-${Date.now()}`;
+    const callbackUrl = `${process.env.APP_URL || 'https://vendormind-z.web.app'}/wallet`;
+
+    const result = await NombaService.createCheckoutOrder({
+      amountNGN: amount,
+      orderReference,
+      callbackUrl,
+      customerEmail: vendor.email,
+      metadata: { type: 'WALLET_TOPUP', vendorId: request.params.id, amount: String(amount) }
+    });
+
+    return { checkoutUrl: result.checkoutLink, orderReference: result.orderReference };
+  });
+
+  // ── Catalog Embedding Progress ────────────────────────────────────
+  fastify.get<{ Params: { id: string } }>('/vendors/:id/catalog/progress', async (request, reply) => {
+    let vendorId: bigint;
+    try { vendorId = BigInt(request.params.id); }
+    catch { return reply.status(400).send({ error: 'Invalid vendor ID' }); }
+
+    const vendor = await prisma.vendor.findUnique({ where: { id: vendorId }, select: { id: true } });
+    if (!vendor) return reply.status(404).send({ error: 'Vendor not found' });
+
+    const total = await prisma.product.count({ where: { vendorId } });
+    const embeddedResult = await prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(*)::bigint as count
+      FROM products
+      WHERE "vendorId" = ${vendorId}
+        AND embedding IS NOT NULL
+    `;
+    const embedded = Number(embeddedResult[0]?.count || 0);
+    const progress = total > 0 ? Number(((embedded / total) * 100).toFixed(1)) : 100.0;
+    const allowed = progress >= 80.0;
+
+    return { total, embedded, progress, allowed };
   });
 
   // ── Products List ────────────────────────────────────────────
@@ -133,7 +195,7 @@ const start = async () => {
     const sortBy    = allowedSort.includes(request.query.sortBy || '') ? request.query.sortBy! : 'name';
     const sortOrder = request.query.sortOrder === 'desc' ? 'desc' : 'asc';
 
-    const [products, total] = await Promise.all([
+    const [products, total, embeddedIdsResult] = await Promise.all([
       prisma.product.findMany({
         where: { vendorId },
         select: { id: true, name: true, description: true, price: true, stock: true, reservedStock: true, imageUrl: true, createdAt: true, updatedAt: true },
@@ -141,7 +203,12 @@ const start = async () => {
         skip, take: limit,
       }),
       prisma.product.count({ where: { vendorId } }),
+      prisma.$queryRaw<Array<{ id: bigint }>>`
+        SELECT id FROM products WHERE "vendorId" = ${vendorId} AND embedding IS NOT NULL
+      `
     ]);
+
+    const embeddedIds = new Set(embeddedIdsResult.map(r => r.id.toString()));
 
     return {
       products: products.map(p => ({
@@ -152,6 +219,7 @@ const start = async () => {
         stock: p.stock,
         reservedStock: p.reservedStock,
         imageUrl: p.imageUrl,
+        isEmbedded: embeddedIds.has(p.id.toString()),
         createdAt: p.createdAt.toISOString(),
         updatedAt: p.updatedAt.toISOString(),
       })),
@@ -379,6 +447,42 @@ const start = async () => {
     return { status: handoff ? 'HANDED_OFF' : 'ACTIVE' };
   });
 
+  // ── Send Manual Message ───────────────────────────────────────────
+  fastify.post<{ Params: { id: string, customerId: string }; Body: { content: string } }>('/vendors/:id/conversations/:customerId/messages', async (request, reply) => {
+    let customerId: bigint;
+    let vendorId: bigint;
+    try {
+      customerId = BigInt(request.params.customerId);
+      vendorId = BigInt(request.params.id);
+    } catch {
+      return reply.status(400).send({ error: 'Invalid customer or vendor ID' });
+    }
+    const { content } = request.body;
+    if (!content?.trim()) {
+      return reply.status(400).send({ error: 'Message content is required' });
+    }
+
+    const customer = await prisma.customer.findUnique({
+      where: { id: customerId }
+    });
+    if (!customer) {
+      return reply.status(404).send({ error: 'Customer not found' });
+    }
+
+    await outboundQueue.add(`reply:manual:${Date.now()}`, {
+      vendorId: vendorId.toString(),
+      remoteJid: `${customer.phoneNumber}@s.whatsapp.net`,
+      content: content.trim()
+    });
+
+    await ContextService.updateContext(customerId, {
+      role: 'assistant',
+      content: content.trim()
+    });
+
+    return { success: true };
+  });
+
   // ── Add Product ───────────────────────────────────────────────────
   fastify.post<{ Params: { id: string }; Body: { name: string; price: number; description?: string; stock: number } }>('/vendors/:id/products', async (request, reply) => {
     let id: bigint;
@@ -542,8 +646,21 @@ const start = async () => {
 
     // Nomba sends payment_success event
     if (event.event === 'payment_success') {
-      const orderReference = event.data?.order?.orderId ?? event.data?.transaction?.reference;
       const orderMetaData = event.data?.orderMetaData ?? {};
+
+      // Wallet top-up payment
+      if (orderMetaData?.type === 'WALLET_TOPUP') {
+        const vendorId = BigInt(orderMetaData.vendorId);
+        const amount = Number(orderMetaData.amount);
+        await prisma.vendor.update({
+          where: { id: vendorId },
+          data: { walletBalance: { increment: amount } }
+        });
+        console.log(`💳 Wallet top-up: vendor ${orderMetaData.vendorId} +₦${amount}`);
+        return reply.status(200).send({ received: true });
+      }
+
+      const orderReference = event.data?.order?.orderId ?? event.data?.transaction?.reference;
       const orderId = orderMetaData?.orderId ? BigInt(orderMetaData.orderId) : null;
       const reference = orderReference as string;
 

@@ -5,6 +5,7 @@ import {
   Package, RefreshCw, Send, ShoppingBag, TrendingUp, Wallet, Wifi, WifiOff,
 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
+import WhatsAppConnectModal from '../components/WhatsAppConnectModal';
 
 const API = (import.meta as any)?.env?.VITE_API_URL ?? 'http://localhost:3000';
 
@@ -38,6 +39,7 @@ export default function Dashboard() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [waConnected, setWaConnected] = useState(false);
+  const [showReconnectModal, setShowReconnectModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState(new Date());
 
@@ -73,7 +75,21 @@ export default function Dashboard() {
     setLastRefresh(new Date());
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    // Poll WA status every 30s so disconnections reflect without manual refresh
+    const waInterval = setInterval(async () => {
+      try {
+        const res = await fetch(`${API}/vendors/${VENDOR_ID}/whatsapp/qr`);
+        if (res.ok) {
+          const data = await res.json() as { status: string };
+          setWaConnected(data.status === 'connected');
+          setLastRefresh(new Date());
+        }
+      } catch {}
+    }, 30_000);
+    return () => clearInterval(waInterval);
+  }, []);
 
   const activeChats = ops?.activeConversations ?? 0;
   const inboundDone = ops?.queues.inbound.completed ?? 0;
@@ -103,9 +119,18 @@ export default function Dashboard() {
                 WhatsApp agent online
               </div>
             ) : (
-              <div className="badge" style={{ background: 'rgba(245,158,11,0.1)', color: '#d97706', marginBottom: '0.65rem' }}>
-                <WifiOff size={13} />
-                WhatsApp agent offline (QR scan needed)
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.65rem' }}>
+                <div className="badge" style={{ background: 'rgba(245,158,11,0.1)', color: '#d97706' }}>
+                  <WifiOff size={13} />
+                  WhatsApp agent offline
+                </div>
+                <button
+                  className="btn-primary"
+                  onClick={() => setShowReconnectModal(true)}
+                  style={{ padding: '0.3rem 0.75rem', fontSize: '0.75rem', height: 'auto' }}
+                >
+                  Reconnect
+                </button>
               </div>
             )}
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.75rem', fontWeight: 800, margin: 0, color: 'var(--text)' }}>
@@ -227,6 +252,17 @@ export default function Dashboard() {
           </aside>
         </div>
       </main>
+
+      {showReconnectModal && (
+        <WhatsAppConnectModal
+          vendorId={VENDOR_ID}
+          onConnected={() => {
+            setWaConnected(true);
+            setShowReconnectModal(false);
+          }}
+          onClose={() => setShowReconnectModal(false)}
+        />
+      )}
     </div>
   );
 }

@@ -40,6 +40,8 @@ export default function Conversations() {
   const [loadingList, setLoadingList] = useState(true);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [toggleHandoffLoading, setToggleHandoffLoading] = useState(false);
+  const [typedMessage, setTypedMessage] = useState('');
+  const [sendLoading, setSendLoading] = useState(false);
 
   // Mask phone numbers for demo compliance if needed, or keep it readable
   const maskPhone = (phone: string) => {
@@ -98,6 +100,33 @@ export default function Conversations() {
       console.error('Handoff toggle failed:', err);
     } finally {
       setToggleHandoffLoading(false);
+    }
+  };
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!typedMessage.trim() || !detail) return;
+    setSendLoading(true);
+    try {
+      const res = await fetch(`${API}/vendors/${VENDOR_ID}/conversations/${detail.customerId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: typedMessage.trim() }),
+      });
+      if (res.ok) {
+        const newMsg = {
+          id: `local-${Date.now()}`,
+          role: 'assistant' as const,
+          content: typedMessage.trim(),
+          timestamp: new Date().toISOString()
+        };
+        setDetail(prev => prev ? { ...prev, messages: [...prev.messages, newMsg] } : null);
+        setTypedMessage('');
+      }
+    } catch (err) {
+      console.error('Failed to send message:', err);
+    } finally {
+      setSendLoading(false);
     }
   };
 
@@ -256,53 +285,92 @@ export default function Conversations() {
 
                 {/* Conversation Body split */}
                 <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-                  {/* Messages bubble feed */}
-                  <div style={{
-                    flex: 1, display: 'flex', flexDirection: 'column',
-                    padding: '1.5rem', overflowY: 'auto', gap: '0.75rem'
-                  }}>
-                    {detail.messages.length === 0 ? (
-                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', color: 'var(--text-3)' }}>
-                        <AlertCircle size={22} style={{ marginBottom: '0.5rem' }} />
-                        <p style={{ margin: 0, fontSize: '0.8rem' }}>No messages recorded in context</p>
-                      </div>
-                    ) : (
-                      detail.messages.map((m) => {
-                        const isUser = m.role === 'user';
-                        return (
-                          <div
-                            key={m.id}
-                            style={{
-                              display: 'flex',
-                              justifyContent: isUser ? 'flex-start' : 'flex-end',
-                            }}
-                          >
-                            <div style={{
-                              background: isUser ? 'var(--surface)' : 'var(--brand)',
-                              color: isUser ? 'var(--text)' : '#ffffff',
-                              border: isUser ? '1px solid var(--border)' : 'none',
-                              borderRadius: isUser ? '16px 16px 16px 4px' : '16px 16px 4px 16px',
-                              padding: '0.65rem 0.9rem',
-                              maxWidth: '75%',
-                              fontSize: '0.84rem',
-                              lineHeight: 1.5,
-                              boxShadow: 'var(--shadow-xs)',
-                              whiteSpace: 'pre-line'
-                            }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.2rem' }}>
-                                {isUser ? (
-                                  <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--brand)' }}>Customer</span>
-                                ) : (
-                                  <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.8)', display: 'flex', alignItems: 'center', gap: '2px' }}>
-                                    <Bot size={10} /> AI Agent
-                                  </span>
-                                )}
+                  {/* Messages bubble feed wrapper */}
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                    
+                    {/* Scrollable Messages bubble feed */}
+                    <div style={{
+                      flex: 1, display: 'flex', flexDirection: 'column',
+                      padding: '1.5rem', overflowY: 'auto', gap: '0.75rem'
+                    }}>
+                      {detail.messages.length === 0 ? (
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', color: 'var(--text-3)' }}>
+                          <AlertCircle size={22} style={{ marginBottom: '0.5rem' }} />
+                          <p style={{ margin: 0, fontSize: '0.8rem' }}>No messages recorded in context</p>
+                        </div>
+                      ) : (
+                        detail.messages.map((m) => {
+                          const isUser = m.role === 'user';
+                          return (
+                            <div
+                              key={m.id}
+                              style={{
+                                display: 'flex',
+                                justifyContent: isUser ? 'flex-start' : 'flex-end',
+                              }}
+                            >
+                              <div style={{
+                                background: isUser ? 'var(--surface)' : 'var(--brand)',
+                                color: isUser ? 'var(--text)' : '#ffffff',
+                                border: isUser ? '1px solid var(--border)' : 'none',
+                                borderRadius: isUser ? '16px 16px 16px 4px' : '16px 16px 4px 16px',
+                                padding: '0.65rem 0.9rem',
+                                maxWidth: '75%',
+                                fontSize: '0.84rem',
+                                lineHeight: 1.5,
+                                boxShadow: 'var(--shadow-xs)',
+                                whiteSpace: 'pre-line'
+                              }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.2rem' }}>
+                                  {isUser ? (
+                                    <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--brand)' }}>Customer</span>
+                                  ) : (
+                                    <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.8)', display: 'flex', alignItems: 'center', gap: '2px' }}>
+                                      <Bot size={10} /> AI Agent
+                                    </span>
+                                  )}
+                                </div>
+                                {m.content}
                               </div>
-                              {m.content}
                             </div>
-                          </div>
-                        );
-                      })
+                          );
+                        })
+                      )}
+                    </div>
+
+                    {/* Chat Takeover Response Footer */}
+                    {detail.status === 'HANDED_OFF' ? (
+                      <form onSubmit={handleSendMessage} style={{
+                        padding: '1rem', background: 'var(--surface)', borderTop: '1px solid var(--border)',
+                        display: 'flex', gap: '0.75rem', alignItems: 'center'
+                      }}>
+                        <input
+                          type="text"
+                          className="input"
+                          value={typedMessage}
+                          onChange={e => setTypedMessage(e.target.value)}
+                          placeholder="Type a message to respond manually..."
+                          disabled={sendLoading}
+                          style={{ flex: 1, padding: '0.65rem 0.85rem', borderRadius: 8, fontSize: '0.85rem' }}
+                        />
+                        <button type="submit" className="btn-primary" disabled={sendLoading || !typedMessage.trim()} style={{ padding: '0.65rem 1.25rem', height: '100%', borderRadius: 8, display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}>
+                          {sendLoading ? (
+                            <Loader2 size={14} style={{ animation: 'spin-slow 1s linear infinite' }} />
+                          ) : (
+                            <Send size={14} />
+                          )}
+                          Send
+                        </button>
+                      </form>
+                    ) : (
+                      <div style={{
+                        padding: '0.75rem 1.25rem', background: 'rgba(245,158,11,0.04)',
+                        borderTop: '1px solid rgba(245,158,11,0.15)', display: 'flex', alignItems: 'center',
+                        gap: '0.5rem', color: '#d97706', fontSize: '0.75rem'
+                      }}>
+                        <ShieldAlert size={14} />
+                        <span>Chat is managed by AI. Click <strong>Take Over Chat</strong> above to manually respond.</span>
+                      </div>
                     )}
                   </div>
 

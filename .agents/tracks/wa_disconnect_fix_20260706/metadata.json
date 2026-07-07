@@ -1,0 +1,7 @@
+{
+  "name": "wa-disconnect-fix",
+  "status": "completed",
+  "created": "2026-07-06",
+  "completed": "2026-07-06",
+  "description": "Fix WhatsApp disconnect not reflecting on portal: fleet worker writes connected:false on close, dashboard polls WA status every 30s"
+}

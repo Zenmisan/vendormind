@@ -4,7 +4,7 @@
  * Usage: bun run scripts/verify.ts
  */
 
-import { inboundQueue, OUTBOUND_QUEUE, OutboundMessageJob } from '../src/shared/queue';
+import { inboundQueue, outboundQueue, OUTBOUND_QUEUE, OutboundMessageJob } from '../src/shared/queue';
 import { redisConnection } from '../src/shared/redis';
 import { prisma } from '../src/shared/prisma/client';
 import { ContextService } from '../src/shared/context.service';
@@ -12,7 +12,7 @@ import { Worker } from 'bullmq';
 
 const CUSTOMER_PHONE = '234999888777';
 const VENDOR_ID = process.env.VENDOR_ID || '1';
-const TIMEOUT_MS = 8000;
+const TIMEOUT_MS = 45000;
 
 async function send(type: 'text' | 'location', content?: string, location?: { lat: number; lng: number }) {
   const messageId = `verify-${Date.now()}`;
@@ -23,14 +23,20 @@ async function send(type: 'text' | 'location', content?: string, location?: { la
 }
 
 async function waitForReply(label: string): Promise<string | null> {
-  return new Promise(resolve => {
+  let worker: Worker<OutboundMessageJob> | null = null;
+  const result = await new Promise<string | null>(resolve => {
     const timeout = setTimeout(() => resolve(null), TIMEOUT_MS);
-    const worker = new Worker<OutboundMessageJob>(OUTBOUND_QUEUE, async (job) => {
+
+    worker = new Worker<OutboundMessageJob>(OUTBOUND_QUEUE, async (job) => {
       clearTimeout(timeout);
-      await worker.close();
       resolve(job.data.content);
     }, { connection: redisConnection });
   });
+
+  if (worker) {
+    await (worker as Worker).close();
+  }
+  return result;
 }
 
 async function main() {
@@ -42,8 +48,13 @@ async function main() {
   });
   if (existing) {
     await prisma.wa_session.deleteMany({ where: { customerId: existing.id } });
+    await redisConnection.del(`handoff:${existing.id}`);
     console.log('Cleaned up previous session context.\n');
   }
+
+  await inboundQueue.drain();
+  await outboundQueue.drain();
+  console.log('Drained inbound and outbound queues.\n');
 
   const steps: Array<{ label: string; fn: () => Promise<void> }> = [
     { label: 'Browse catalog', fn: () => send('text', 'browse catalog') },

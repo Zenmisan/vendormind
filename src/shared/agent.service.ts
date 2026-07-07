@@ -199,7 +199,7 @@ When the customer is ready to pay, call generatePaymentLink. If they need human 
           const docs = await prisma.$queryRaw<Array<{ title: string | null; content: string }>>`
             SELECT title, content
             FROM documents
-            WHERE vendor_id = ${vendorId}
+            WHERE "vendorId" = ${vendorId}
               AND embedding IS NOT NULL
             ORDER BY embedding <=> ${vectorStr}::vector
             LIMIT 3

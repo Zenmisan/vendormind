@@ -53,6 +53,12 @@ export default function Onboard() {
   const [balance, setBalance] = useState<number>(0);
   const [topUpLoading, setTopUpLoading] = useState(false);
 
+  // Progress states for Onboarding Gate
+  const [progressTotal, setProgressTotal] = useState<number>(0);
+  const [progressEmbedded, setProgressEmbedded] = useState<number>(0);
+  const [progressPercent, setProgressPercent] = useState<number>(0);
+  const [progressAllowed, setProgressAllowed] = useState<boolean>(true);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadDone, setUploadDone] = useState(false);
@@ -127,10 +133,30 @@ export default function Onboard() {
     } catch {}
   };
 
+  const checkProgress = async () => {
+    if (!vendor) return;
+    try {
+      const res = await fetch(`${API}/vendors/${vendor.id}/catalog/progress`);
+      if (res.ok) {
+        const data = await res.json() as { total: number; embedded: number; progress: number; allowed: boolean };
+        setProgressTotal(data.total);
+        setProgressEmbedded(data.embedded);
+        setProgressPercent(data.progress);
+        setProgressAllowed(data.allowed);
+      }
+    } catch {}
+  };
+
   useEffect(() => {
+    let interval: any = null;
     if (step === 5 && vendor) {
       loadWallet();
+      checkProgress();
+      interval = setInterval(checkProgress, 3000);
     }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
   }, [step, vendor]);
 
   const register = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -207,14 +233,18 @@ export default function Onboard() {
     if (!vendor) return;
     setTopUpLoading(true);
     try {
-      const res = await fetch(`${API}/topup`, {
+      const res = await fetch(`${API}/vendors/${vendor.id}/wallet/topup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vendorId: vendor.id, amount: 2000 })
+        body: JSON.stringify({ amount: 2000 })
       });
       if (res.ok) {
-        const payload = await res.json() as { newBalance: number };
-        setBalance(payload.newBalance);
+        const payload = await res.json() as { checkoutUrl?: string; newBalance?: number };
+        if (payload.checkoutUrl) {
+          window.location.href = payload.checkoutUrl;
+          return;
+        }
+        if (payload.newBalance !== undefined) setBalance(payload.newBalance);
       }
     } catch {}
     setTopUpLoading(false);
@@ -249,39 +279,76 @@ export default function Onboard() {
             <p style={{ color: 'var(--text-2)', fontSize: '0.9rem', lineHeight: 1.7, margin: '0 0 1.5rem' }}>
               Add your store details, upload your catalog, customize the agent persona, and scan WhatsApp QR.
             </p>
-            <div style={{ display: 'grid', gap: '0.75rem' }}>
-              {steps.map(s => (
-                <div key={s.n} style={{
-                  display: 'grid',
-                  gridTemplateColumns: '34px 1fr',
-                  gap: '0.75rem',
-                  alignItems: 'center',
-                  padding: '0.75rem',
-                  borderRadius: 12,
-                  background: step === s.n ? 'rgba(22,163,74,0.08)' : 'transparent',
-                  border: `1px solid ${step === s.n ? 'rgba(22,163,74,0.16)' : 'var(--border-subtle)'}`,
-                }}>
-                  <div style={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    background: step > s.n ? 'var(--brand)' : 'var(--surface)',
-                    color: step > s.n ? '#fff' : step === s.n ? 'var(--brand)' : 'var(--text-3)',
-                    border: `1px solid ${step >= s.n ? 'var(--brand)' : 'var(--border)'}`,
-                    fontWeight: 800,
-                    fontSize: '0.78rem',
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', position: 'relative', margin: '0.5rem 0' }}>
+              <div style={{
+                position: 'absolute',
+                left: 21,
+                top: 24,
+                bottom: 24,
+                width: 2,
+                background: 'rgba(255, 255, 255, 0.08)',
+                zIndex: 0
+              }} />
+              {steps.map(s => {
+                const isActive = step === s.n;
+                const isCompleted = step > s.n;
+                return (
+                  <div key={s.n} style={{
+                    display: 'grid',
+                    gridTemplateColumns: '26px 1fr',
+                    gap: '1.25rem',
+                    alignItems: 'start',
+                    padding: '0.75rem 0.5rem',
+                    position: 'relative',
+                    zIndex: 1
                   }}>
-                    {step > s.n ? <CheckCircle size={15} /> : s.n}
+                    <div style={{
+                      width: 26,
+                      height: 26,
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: isCompleted ? 'var(--brand)' : isActive ? 'var(--bg)' : 'var(--surface-raised)',
+                      color: isCompleted ? '#05080e' : isActive ? 'var(--brand)' : 'var(--text-3)',
+                      border: `1px solid ${isActive || isCompleted ? 'var(--brand)' : 'var(--border)'}`,
+                      fontWeight: 800,
+                      fontSize: '0.74rem',
+                      boxShadow: isActive ? 'var(--shadow-brand)' : 'none',
+                      transition: 'all 0.2s ease',
+                      flexShrink: 0,
+                      marginTop: '0.15rem'
+                    }}>
+                      {isCompleted ? '✓' : s.n}
+                    </div>
+                    <div>
+                      <p style={{ margin: 0, fontSize: '0.86rem', fontWeight: isActive ? 800 : 600, color: isActive ? 'var(--text)' : 'var(--text-2)', transition: 'color 0.2s' }}>{s.label}</p>
+                      <p style={{ margin: '0.15rem 0 0', fontSize: '0.74rem', color: isActive ? 'var(--text-2)' : 'var(--text-3)', transition: 'color 0.2s' }}>{s.desc}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: 800 }}>{s.label}</p>
-                    <p style={{ margin: '0.1rem 0 0', fontSize: '0.74rem', color: 'var(--text-3)' }}>{s.desc}</p>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
+            </div>
+
+            {/* Quick Tip Box inspired by inspo/01.jpeg */}
+            <div style={{
+              marginTop: '1.5rem',
+              padding: '1rem 1.15rem',
+              background: 'rgba(74, 222, 128, 0.03)',
+              border: '1px solid rgba(74, 222, 128, 0.08)',
+              borderRadius: 10,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
+                <Sparkles size={14} color="var(--brand)" />
+                <span style={{ fontSize: '0.76rem', fontWeight: 800, color: 'var(--brand)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Quick Tip</span>
+              </div>
+              <p style={{ fontSize: '0.74rem', color: 'var(--text-2)', margin: 0, lineHeight: 1.6 }}>
+                {step === 1 && "Create a distinct store profile name. This name is what customers will see and refer to your store as."}
+                {step === 2 && "The AI persona guides the tone of responses. Friendly works best for retail stores, while Professional works best for tech/services."}
+                {step === 3 && "You can upload files in CSV or XLSX format. Ensure columns for Name, Price, and Description are clearly marked."}
+                {step === 4 && "Make sure your WhatsApp device has a stable internet connection before scanning the QR code to ensure seamless connection."}
+                {step === 5 && "Adding credits helps test message delivery in real-time. Each message sent consumes a microscopic credit fraction."}
+              </p>
             </div>
           </aside>
 
@@ -561,6 +628,28 @@ export default function Onboard() {
                   )}
                 </div>
 
+                {progressTotal > 0 && (
+                  <div className="progress-section" style={{
+                    background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: 8,
+                    border: '1px solid rgba(255,255,255,0.05)', marginBottom: '1.25rem'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-2)', marginBottom: '0.35rem' }}>
+                      <span>AI Catalog Indexing</span>
+                      <span>{progressEmbedded} / {progressTotal} ({progressPercent}%)</span>
+                    </div>
+                    <div style={{ width: '100%', height: 6, background: 'rgba(255,255,255,0.07)', borderRadius: 3, overflow: 'hidden' }}>
+                      <div style={{ width: `${progressPercent}%`, height: '100%', background: progressPercent >= 80 ? 'var(--brand)' : '#f59e0b', transition: 'width 0.4s ease' }} />
+                    </div>
+                    <p style={{ fontSize: '0.725rem', margin: '0.5rem 0 0', color: progressPercent >= 80 ? '#4ade80' : '#f59e0b' }}>
+                      {progressPercent >= 80 ? (
+                        "✓ Catalog sufficiently indexed. You are ready to go live!"
+                      ) : (
+                        "⚡ Indexing in progress. Go-live is blocked until at least 80% of products are embedded."
+                      )}
+                    </p>
+                  </div>
+                )}
+
                 <div style={{ display: 'grid', gap: '0.75rem' }}>
                   <button className="btn-ghost" onClick={addCredits} disabled={topUpLoading} style={{ padding: '0.85rem', width: '100%', display: 'flex', justifyContent: 'center', gap: '0.5rem' }}>
                     {topUpLoading ? (
@@ -573,11 +662,12 @@ export default function Onboard() {
 
                   <button
                     className="btn-primary"
-                    disabled={balance <= 0}
+                    disabled={balance <= 0 || (progressTotal > 0 && !progressAllowed)}
                     onClick={() => navigate('/dashboard')}
                     style={{
                       padding: '0.85rem', width: '100%', marginTop: '0.5rem',
-                      opacity: balance <= 0 ? 0.6 : 1, cursor: balance <= 0 ? 'not-allowed' : 'pointer'
+                      opacity: (balance <= 0 || (progressTotal > 0 && !progressAllowed)) ? 0.6 : 1,
+                      cursor: (balance <= 0 || (progressTotal > 0 && !progressAllowed)) ? 'not-allowed' : 'pointer'
                     }}
                   >
                     Go Live & Access Dashboard

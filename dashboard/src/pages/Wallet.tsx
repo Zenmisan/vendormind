@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Wallet, RefreshCw, Plus, CheckCircle, Clock, TrendingUp, CreditCard,
-  MessageCircle, Send, Sparkles, Loader2, DollarSign
+  MessageCircle, Send, Sparkles, Loader2, DollarSign, ChevronDown
 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 
@@ -50,29 +50,31 @@ export default function WalletPage() {
     if (!amount || amount <= 0) return;
     setTopUpLoading(true);
     try {
-      const res = await fetch(`${API}/topup`, {
+      const res = await fetch(`${API}/vendors/${VENDOR_ID}/wallet/topup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vendorId: VENDOR_ID, amount }),
+        body: JSON.stringify({ amount }),
       });
       if (res.ok) {
-        const payload = await res.json() as { newBalance: number };
-        setData(prev => prev ? {
-          ...prev,
-          balance: payload.newBalance,
-          transactions: [
-            {
-              id: 'tx_' + Date.now(),
-              description: 'Wallet Top Up',
-              amount,
-              type: 'credit',
-              createdAt: new Date().toISOString()
-            },
-            ...prev.transactions
-          ]
-        } : null);
-        setShowSuccess(true);
-        setTimeout(() => setShowSuccess(false), 4000);
+        const payload = await res.json() as { checkoutUrl?: string; newBalance?: number; mode?: string };
+        if (payload.checkoutUrl) {
+          // Real Nomba checkout — redirect vendor to payment page
+          window.location.href = payload.checkoutUrl;
+          return;
+        }
+        // Dev fallback (mock mode) — balance updated directly
+        if (payload.newBalance !== undefined) {
+          setData(prev => prev ? {
+            ...prev,
+            balance: payload.newBalance!,
+            transactions: [
+              { id: 'tx_' + Date.now(), description: 'Wallet Top Up (Dev)', amount, type: 'credit', createdAt: new Date().toISOString() },
+              ...prev.transactions
+            ]
+          } : null);
+          setShowSuccess(true);
+          setTimeout(() => setShowSuccess(false), 4000);
+        }
       }
     } catch (err) {
       console.error('Top up failed:', err);
@@ -200,19 +202,38 @@ export default function WalletPage() {
               </div>
               <form onSubmit={handleTopUp} style={{ display: 'grid', gap: '1rem' }}>
                 <label style={{ display: 'grid', gap: '0.35rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-2)' }}>
-                  Select amount (₦)
-                  <select
+                  Amount to top up (₦)
+                  <input
+                    type="number"
+                    required
+                    min="100"
                     className="input"
                     value={topUpAmount}
                     onChange={e => setTopUpAmount(e.target.value)}
-                    style={{ background: 'var(--surface)' }}
-                  >
-                    <option value="1000">₦1,000 (Basic)</option>
-                    <option value="2000">₦2,000 (Recommended)</option>
-                    <option value="5000">₦5,000 (Premium)</option>
-                    <option value="10000">₦10,000 (Enterprise)</option>
-                  </select>
+                    placeholder="Enter amount (e.g. 2000)"
+                    style={{
+                      background: 'var(--surface)',
+                      fontWeight: 600,
+                      color: 'var(--text)',
+                      border: '1px solid var(--border)',
+                    }}
+                  />
                 </label>
+
+                {/* Quick select pills */}
+                <div style={{ display: 'flex', gap: '0.375rem', flexWrap: 'wrap', marginTop: '-0.25rem' }}>
+                  {['1000', '2000', '5000', '10000'].map(amt => (
+                    <button
+                      key={amt}
+                      type="button"
+                      onClick={() => setTopUpAmount(amt)}
+                      className={topUpAmount === amt ? 'filter-pill active' : 'filter-pill'}
+                      style={{ padding: '0.35rem 0.65rem', fontSize: '0.7rem' }}
+                    >
+                      ₦{Number(amt).toLocaleString()}
+                    </button>
+                  ))}
+                </div>
 
                 {showSuccess && (
                   <div className="success-panel" style={{ padding: '0.75rem' }}>

@@ -14,6 +14,7 @@ interface Product {
   stock: number;
   reservedStock: number;
   description: string | null;
+  isEmbedded?: boolean;
   createdAt?: string;
 }
 
@@ -284,8 +285,8 @@ export default function Products() {
                 <tbody>
                   {filtered.map(p => {
                     const available = p.stock - p.reservedStock;
-                    // Derive embedding status: if it is a live product, it queues embeddings instantly
-                    const isEmbedded = !usingSamples;
+                    // Derive embedding status: if using samples it is demo, otherwise read isEmbedded
+                    const isEmbedded = usingSamples ? false : !!p.isEmbedded;
 
                     return (
                       <tr key={p.id}>
@@ -306,9 +307,13 @@ export default function Products() {
                             <span className="badge" style={{ background: 'rgba(22,163,74,0.08)', color: 'var(--brand)' }}>
                               ● Embedded
                             </span>
+                          ) : usingSamples ? (
+                            <span className="badge" style={{ background: 'rgba(100,116,139,0.08)', color: 'var(--text-3)' }}>
+                              ● Demo static
+                            </span>
                           ) : (
                             <span className="badge" style={{ background: 'rgba(245,158,11,0.08)', color: '#d97706' }}>
-                              ● Demo static
+                              ● Indexing
                             </span>
                           )}
                         </td>
