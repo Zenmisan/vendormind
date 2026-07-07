@@ -36,6 +36,7 @@ async function transcribeAudio(msg: any): Promise<string | null> {
 
 async function startSock(vendorId: string) {
   if (socketMap.has(vendorId)) return;
+  let reconnectCount = 0;
   const { state, saveCreds } = await usePrismaAuthState(vendorId);
   const { version, isLatest } = await fetchLatestBaileysVersion();
   const vId = BigInt(vendorId);
@@ -105,8 +106,9 @@ async function startSock(vendorId: string) {
         console.log(`[Vendor ${vendorId}] Logged out — clearing session`);
         await prisma.whatsAppSession.deleteMany({ where: { vendorId: vId } });
       } else if (statusCode !== 440) {
-        console.log(`[Vendor ${vendorId}] Disconnected (${statusCode}) — reconnecting...`);
-        const delay = Math.min(5000 * (2 ** Math.min(sock.ev.listenerCount('connection.update'), 4)), 60000);
+        reconnectCount++;
+        const delay = Math.min(5000 * (2 ** Math.min(reconnectCount, 4)), 60000);
+        console.log(`[Vendor ${vendorId}] Disconnected (${statusCode}) — reconnecting in ${delay/1000}s (attempt ${reconnectCount})`);
         setTimeout(() => startSock(vendorId), delay);
       }
     } else if (connection === 'open') {

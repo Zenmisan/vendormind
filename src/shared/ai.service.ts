@@ -163,32 +163,47 @@ export class AIService {
   }
 
   private static async callGroq(system: string, messages: Anthropic.MessageParam[], tools: any[]): Promise<AIProviderResponse> {
-    const response = await this.groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
-      messages: [
-        { role: 'system', content: system },
-        ...messages.map(m => {
-            const text = this.mapContentToText(m.content);
-            return { role: m.role, content: text };
-        })
-      ] as any,
-      tools: tools.map(t => ({
-        type: 'function',
-        function: {
-          name: t.name,
-          description: t.description,
-          parameters: t.input_schema
-        }
+    const groqMessages = [
+      { role: 'system' as const, content: system },
+      ...messages.map(m => ({
+        role: m.role as 'user' | 'assistant',
+        content: this.mapContentToText(m.content)
       }))
-    });
+    ];
 
-    const msg = response.choices[0].message;
-    const toolCalls = msg.tool_calls?.map(tc => ({
-      id: tc.id,
-      name: tc.function.name,
-      input: JSON.parse(tc.function.arguments)
+    const groqTools = tools.map(t => ({
+      type: 'function' as const,
+      function: { name: t.name, description: t.description, parameters: t.input_schema }
     }));
 
-    return { content: msg.content || "", toolCalls: toolCalls && toolCalls.length > 0 ? toolCalls : undefined };
+    try {
+      const response = await this.groq.chat.completions.create({
+        model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+        messages: groqMessages,
+        tools: groqTools,
+        tool_choice: 'auto',
+        parallel_tool_calls: false,
+        max_tokens: 2048,
+      } as any);
+
+      const msg = response.choices[0].message;
+      const toolCalls = msg.tool_calls?.map(tc => ({
+        id: tc.id,
+        name: tc.function.name,
+        input: JSON.parse(tc.function.arguments)
+      }));
+
+      return { content: msg.content || '', toolCalls: toolCalls?.length ? toolCalls : undefined };
+    } catch (toolErr: any) {
+      // Tool calling failed (common on some Groq models) — retry as plain text
+      console.warn('⚠️ Groq tool calling failed, retrying as plain text...');
+      const fallback = await this.groq.chat.completions.create({
+        model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+        messages: groqMessages,
+        max_tokens: 1024,
+      } as any);
+      const text = fallback.choices[0].message.content || '';
+      return { content: text };
+    }
   }
 }
