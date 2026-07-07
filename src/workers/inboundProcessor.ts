@@ -109,12 +109,20 @@ const worker = new Worker<InboundMessageJob>(
         responseText = useLLM
           ? await AgentService.process(customer.id, vId, content, context)
           : await MockAgentService.process(content, context);
+        if (responseText === '__STAND_DOWN__') {
+          console.log(`\uD83D\uDE07 Stand-down triggered: "${content}" is classified as personal. Skipping reply.`);
+          return;
+        }
         await ContextService.updateContext(customer.id, { role: 'user', content });
       } else if (type === 'location' && location) {
         const locationNote = `[User sent precise location: Lat ${location.lat}, Lng ${location.lng}]`;
         responseText = useLLM
           ? await AgentService.process(customer.id, vId, locationNote, context)
           : await MockAgentService.process(locationNote, context);
+        if (responseText === '__STAND_DOWN__') {
+          console.log(`\uD83D\uDE07 Stand-down triggered: location classification personal. Skipping reply.`);
+          return;
+        }
         await ContextService.updateContext(customer.id, { role: 'user', content: locationNote });
       } else {
         responseText = "I can only process text and location messages right now.";

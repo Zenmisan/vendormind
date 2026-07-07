@@ -10,6 +10,7 @@ Complete reconfiguration and redesign of the VendorMind frontend dashboard, land
 - **FR-4**: Onboarding wizard layout utilizes a connected vertical timeline progress bar on the left with circular steps and helper cards.
 - **FR-5**: Conversations chat inbox adopts a 3-column dark layout with collapsible list groups and take-over reply feeds.
 - **FR-6**: Catalog manager displays outline statistics cards and tables with inline thumbnails.
+- **FR-7**: Onboarding page header displays the active brand logo dynamically matched to the light/dark theme instead of a generic shopping cart icon.
 
 ## Acceptance Criteria
 - [ ] Frontend compiles successfully using `bun run build`.

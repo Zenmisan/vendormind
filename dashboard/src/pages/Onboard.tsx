@@ -250,14 +250,15 @@ export default function Onboard() {
     setTopUpLoading(false);
   };
 
+  const isDark = document.documentElement.classList.contains('dark');
+  const logoSrc = isDark ? '/logo-dark.png' : '/logo-light.png';
+
   return (
     <div className="app-shell" style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
       <header style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '1rem 1.5rem' }}>
         <div style={{ maxWidth: 980, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
           <button onClick={() => navigate('/')} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-            <div style={{ width: 30, height: 30, background: 'var(--brand)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <ShoppingCart size={14} color="#fff" />
-            </div>
+            <img src={logoSrc} alt="VendorMind logo" style={{ width: 28, height: 28 }} />
             <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1rem', color: 'var(--text)' }}>VendorMind</span>
           </button>
           <button className="btn-ghost" onClick={() => navigate('/dashboard')}>
@@ -657,7 +658,7 @@ export default function Onboard() {
                     ) : (
                       <CreditCard size={15} />
                     )}
-                    Simulate ₦2,000 Top-up (Nomba Checkout)
+                    Top-up ₦2,000 (Nomba Checkout)
                   </button>
 
                   <button

@@ -16,6 +16,7 @@ Status: completed
 - [x] **Task 2.2**: Redesign Onboarding wizard to split-screen stepper
 - [x] **Task 2.3**: Restyle Conversations panel to 3-column list chat layouts
 - [x] **Task 2.4**: Upgrade Products catalog page with list grid thumbnails and status tags
+- [x] **Task 2.5**: Replace generic ShoppingCart logo with brand logo in Onboarding header
 
 ### Verification
 - [x] **Verify 2.1**: All pages display consistent logos and styles without UI regressions.

@@ -8,6 +8,20 @@ import { redisConnection } from './redis';
 
 export class AgentService {
   static async process(customerId: bigint, vendorId: bigint, text: string, context: SessionContext): Promise<string> {
+    const customerRecord = await prisma.customer.findUnique({
+      where: { id: customerId },
+      include: { cart: { include: { items: true } } }
+    });
+    const hasCartItems = (customerRecord?.cart?.items?.length ?? 0) > 0;
+    const hasActiveSession = context.recentMessages.length > 0 || hasCartItems;
+
+    if (!hasActiveSession) {
+      const isBusiness = await this.isBusinessConversation(text);
+      if (!isBusiness) {
+        return '__STAND_DOWN__';
+      }
+    }
+
     const messages: Anthropic.MessageParam[] = [
       ...context.recentMessages,
       { role: "user", content: text }
@@ -341,11 +355,45 @@ When the customer is ready to pay, call generatePaymentLink. If they need human 
       return null;
     }
   }
+
+  static async isBusinessConversation(text: string): Promise<boolean> {
+    const systemPrompt = `You are a conversation classifier for a WhatsApp business sales assistant.
+Your task is to determine if the user's message is a business/commerce inquiry (e.g. catalog browsing, price request, shipping, ordering, checkouts, store policies) OR a standard business greeting (e.g., "hi", "hello", "good morning", "is anyone there?").
+Otherwise, if it is a personal/casual chat or general chit-chat unrelated to shopping/business (e.g., "what are you doing tonight?", "are you free?", "wanna hang out?", "how was your day?", "hey buddy"), classify it as PERSONAL.
+
+Respond with exactly one word:
+"BUSINESS" - if it is a business/commerce query or standard business greeting.
+"PERSONAL" - if it is personal chat or casual chit-chat unrelated to the business.`;
+
+    try {
+      const response = await AIService.generateResponse(
+        systemPrompt,
+        [{ role: "user", content: text }],
+        []
+      );
+      const verdict = response.content.trim().toUpperCase();
+      console.log(`🔍 Conversation classification for "${text}": ${verdict}`);
+      return verdict !== 'PERSONAL';
+    } catch (err) {
+      console.error("Classifier failed, defaulting to BUSINESS:", err);
+      return true;
+    }
+  }
 }
 
 export class MockAgentService {
   static async process(text: string, _context: SessionContext): Promise<string> {
     const input = text.toLowerCase();
+    
+    // Check if personal/casual chit-chat
+    const personalPhrases = [
+      "doing tonight", "wanna hang", "hang out", "are you free", "how was your day", "how is your day",
+      "what's up", "sup buddy", "hey buddy", "how are you doing", "how are you"
+    ];
+    if (personalPhrases.some(p => input.includes(p))) {
+      return '__STAND_DOWN__';
+    }
+
     if (input.includes('browse') || input.includes('catalog') || input.includes('menu')) {
       return `Here is our catalog:\n• Premium Coffee Beans — ₦15,000\n• Green Tea Leaves — ₦10,000\n• Vanilla Syrup — ₦8,000\n\nWhat would you like to add to your cart?`;
     }

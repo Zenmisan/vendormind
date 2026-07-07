@@ -119,6 +119,17 @@ async function startSock(vendorId: string) {
     }
   });
 
+  function extractMessageText(message: any): string | null {
+    if (!message) return null;
+    if (message.conversation) return message.conversation;
+    if (message.extendedTextMessage?.text) return message.extendedTextMessage.text;
+    if (message.ephemeralMessage?.message) return extractMessageText(message.ephemeralMessage.message);
+    if (message.viewOnceMessage?.message) return extractMessageText(message.viewOnceMessage.message);
+    if (message.viewOnceMessageV2?.message) return extractMessageText(message.viewOnceMessageV2.message);
+    if (message.documentWithCaptionMessage?.message) return extractMessageText(message.documentWithCaptionMessage.message);
+    return null;
+  }
+
   sock.ev.on('messages.upsert', async (m) => {
     if (m.type !== 'notify') return;
 
@@ -129,7 +140,7 @@ async function startSock(vendorId: string) {
       const messageId = msg.key.id || '';
       let jobData: InboundMessageJob | null = null;
 
-      const text = msg.message.conversation || msg.message.extendedTextMessage?.text;
+      const text = extractMessageText(msg.message);
       if (text) {
         jobData = { vendorId, customerPhone, messageId, type: 'text', content: text, timestamp: Number(msg.messageTimestamp) || Date.now() };
       } else if (msg.message.locationMessage) {

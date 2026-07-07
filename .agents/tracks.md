@@ -6,6 +6,8 @@
 
 ## Completed Tracks
 
+- [pwa](tracks/pwa_20260707/) — PWA: installable on mobile + desktop, manifest, service worker, icons, offline cache
+- [conversation-filters](tracks/conversation_filters_20260707/) — Conversation Filters & Stand-down: Added recursive WhatsApp message formatting parsing and LLM classifier to stand down on casual personal/friend chats.
 - [link-previews](tracks/link_previews_20260707/) — Link Previews (Open Graph Metadata): Added Open Graph and Twitter Card tags to index.html using the logo image for rich preview embeds.
 - [catalog-fuzzy-ingest](tracks/catalog_fuzzy_ingest_20260707/) — Fuzzy column detection for catalog Excel upload — any header format works now
 - [payments-upgrades](tracks/payments_upgrades_20260707/) — Nomba Payment & Top-up Dropdown Upgrades: URL normalization, Naira-to-Kobo amount scaling, and styled wallet top-up select dropdown.
