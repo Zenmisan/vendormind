@@ -76,7 +76,7 @@ export class NombaService {
       headers: authHeaders(token),
       body: JSON.stringify({
         order: {
-          amount: (params.amountNGN * 100).toFixed(2),
+          amount: params.amountNGN.toFixed(2),
           currency: 'NGN',
           orderReference: params.orderReference,
           callbackUrl: params.callbackUrl,
