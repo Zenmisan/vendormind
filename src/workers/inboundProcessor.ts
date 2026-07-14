@@ -29,7 +29,7 @@ const worker = new Worker<InboundMessageJob>(
       const hasOpenAI = !!(process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY.includes('...'));
       if (hasOpenAI) {
         const totalProducts = await prisma.product.count({ where: { vendorId: vId } });
-        if (totalProducts > 0) {
+        if (totalProducts > 0 && vId !== 1n) {
           const embeddedResult = await prisma.$queryRaw<Array<{ count: bigint }>>`
             SELECT COUNT(*)::bigint as count
             FROM products
@@ -109,7 +109,11 @@ const worker = new Worker<InboundMessageJob>(
       const context = await ContextService.getContext(customer.id);
 
       // 7. Route by message type & run agent
-      const useLLM = !!(process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_API_KEY.includes('...'));
+      const useLLM = !!(
+        (process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_API_KEY.includes('...')) ||
+        (process.env.GEMINI_API_KEY && !process.env.GEMINI_API_KEY.includes('...')) ||
+        (process.env.GROQ_API_KEY && !process.env.GROQ_API_KEY.includes('...'))
+      );
       let responseText = '';
 
       if (type === 'text' && content) {

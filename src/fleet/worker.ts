@@ -56,7 +56,11 @@ async function startSock(vendorId: string) {
     generateHighQualityLinkPreview: false,
     syncFullHistory: false,
     markOnlineOnConnect: true,
-    shouldIgnoreJid: (jid) => jid === 'status@broadcast' || jid?.endsWith('@broadcast'),
+    shouldIgnoreJid: (jid) =>
+      jid === 'status@broadcast' ||
+      jid?.endsWith('@broadcast') ||
+      jid?.endsWith('@g.us') ||
+      jid?.endsWith('@newsletter'),
     getMessage: async (_key) => ({ conversation: '' }),
   });
 
@@ -192,16 +196,22 @@ new Worker<OutboundMessageJob>(OUTBOUND_QUEUE, async (job) => {
     throw new Error(`No socket for vendor ${vendorId}`);
   }
 
-  const state = (sock as any).authState?.creds?.registered;
-  if (state === false) {
+  const isAuth = !!(sock.user || sock.authState?.creds?.me?.id);
+  if (!isAuth) {
     console.error(`📤 [Vendor ${vendorId}] Socket not authenticated — will retry`);
     throw new Error(`Socket not authenticated for vendor ${vendorId}`);
   }
 
+  let cleanJid = remoteJid;
+  if (remoteJid.endsWith('@s.whatsapp.net')) {
+    const num = remoteJid.split('@')[0].replace(/\D/g, '');
+    cleanJid = `${num}@s.whatsapp.net`;
+  }
+
   try {
-    console.log(`📤 [Vendor ${vendorId}] Sending to ${remoteJid}: "${content.slice(0, 60)}..."`);
-    await sock.sendMessage(remoteJid, { text: content });
-    console.log(`✅ [Vendor ${vendorId}] Message delivered to ${remoteJid}`);
+    console.log(`📤 [Vendor ${vendorId}] Sending to ${cleanJid}: "${content.slice(0, 60)}..."`);
+    await sock.sendMessage(cleanJid, { text: content });
+    console.log(`✅ [Vendor ${vendorId}] Message delivered to ${cleanJid}`);
   } catch (err: any) {
     console.error(`❌ [Vendor ${vendorId}] sendMessage failed:`, err.message);
     throw err; // let BullMQ retry

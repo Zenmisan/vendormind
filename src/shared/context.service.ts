@@ -1,5 +1,6 @@
 import { prisma } from './prisma/client';
 import Anthropic from "@anthropic-ai/sdk";
+import { AIService } from './ai.service';
 
 export interface SessionContext {
   summary: string;
@@ -62,23 +63,22 @@ export class ContextService {
   }
 
   private static async summarize(oldSummary: string, role: string, content: string): Promise<string> {
-    const useLLM = process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_API_KEY.includes('...');
+    const useLLM = !!(
+      (process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_API_KEY.includes('...')) ||
+      (process.env.GEMINI_API_KEY && !process.env.GEMINI_API_KEY.includes('...')) ||
+      (process.env.GROQ_API_KEY && !process.env.GROQ_API_KEY.includes('...'))
+    );
     if (!useLLM) {
       return (oldSummary ? oldSummary + '\n' : '') + `${role}: ${content}`;
     }
 
     try {
-      const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-      const response = await anthropic.messages.create({
-        model: "claude-haiku-4-5",
-        max_tokens: 512,
-        system: "You are a concise conversation summarizer. Update the current summary with the new message while keeping it under 2 paragraphs. Focus on important facts like user intent, products discussed, and delivery info.",
-        messages: [
-          { role: "user", content: `Current Summary:\n${oldSummary || 'No summary yet.'}\n\nNew Message to incorporate:\n${role}: ${content}` }
-        ]
-      });
-      const block = response.content.find(b => b.type === 'text');
-      return block && 'text' in block ? block.text : oldSummary;
+      const response = await AIService.generateResponse(
+        "You are a concise conversation summarizer. Update the current summary with the new message while keeping it under 2 paragraphs. Focus on important facts like user intent, products discussed, and delivery info.",
+        [{ role: "user", content: `Current Summary:\n${oldSummary || 'No summary yet.'}\n\nNew Message to incorporate:\n${role}: ${content}` }],
+        []
+      );
+      return response.content;
     } catch (err) {
       console.error('Summarization failed:', err);
       return (oldSummary ? oldSummary + '\n' : '') + `${role}: ${content}`;

@@ -22,10 +22,10 @@ async function send(type: 'text' | 'location', content?: string, location?: { la
   });
 }
 
-async function waitForReply(label: string): Promise<string | null> {
+async function waitForReply(label: string, timeoutMs: number = TIMEOUT_MS): Promise<string | null> {
   let worker: Worker<OutboundMessageJob> | null = null;
   const result = await new Promise<string | null>(resolve => {
-    const timeout = setTimeout(() => resolve(null), TIMEOUT_MS);
+    const timeout = setTimeout(() => resolve(null), timeoutMs);
 
     worker = new Worker<OutboundMessageJob>(OUTBOUND_QUEUE, async (job) => {
       clearTimeout(timeout);
@@ -48,31 +48,43 @@ async function main() {
   });
   if (existing) {
     await prisma.wa_session.deleteMany({ where: { customerId: existing.id } });
+    await prisma.cart.deleteMany({ where: { customerId: existing.id } });
+    await prisma.order.deleteMany({ where: { customerId: existing.id } });
     await redisConnection.del(`handoff:${existing.id}`);
-    console.log('Cleaned up previous session context.\n');
+    console.log('Cleaned up previous session context and cart.\n');
   }
 
   await inboundQueue.drain();
   await outboundQueue.drain();
   console.log('Drained inbound and outbound queues.\n');
 
-  const steps: Array<{ label: string; fn: () => Promise<void> }> = [
-    { label: 'Browse catalog', fn: () => send('text', 'browse catalog') },
-    { label: 'Add to cart',    fn: () => send('text', 'add coffee to cart') },
-    { label: 'Location pin',   fn: () => send('location', undefined, { lat: 6.5244, lng: 3.3792 }) },
-    { label: 'Policy query',   fn: () => send('text', 'what is your refund policy?') },
+  const steps: Array<{ label: string; fn: () => Promise<void>; expectedReply?: boolean; timeout?: number }> = [
+    { label: 'Personal stand-down', fn: () => send('text', 'wanna hang out tonight?'), expectedReply: false, timeout: 3000 },
+    { label: 'Browse catalog', fn: () => send('text', 'browse catalog'), expectedReply: true },
+    { label: 'Add to cart',    fn: () => send('text', 'add coffee to cart'), expectedReply: true },
+    { label: 'Location pin',   fn: () => send('location', undefined, { lat: 6.5244, lng: 3.3792 }), expectedReply: true },
+    { label: 'Policy query',   fn: () => send('text', 'what is your refund policy?'), expectedReply: true },
   ];
 
   let passed = 0;
   for (const step of steps) {
     process.stdout.write(`  ${step.label}... `);
     await step.fn();
-    const reply = await waitForReply(step.label);
-    if (reply) {
-      console.log(`✅ Got reply (${reply.length} chars)`);
-      passed++;
+    const reply = await waitForReply(step.label, step.timeout);
+    if (step.expectedReply === false) {
+      if (!reply) {
+        console.log('✅ Stood down (No reply sent)');
+        passed++;
+      } else {
+        console.log(`❌ Failed: Bot replied: "${reply.slice(0, 30)}..."`);
+      }
     } else {
-      console.log('❌ Timed out');
+      if (reply) {
+        console.log(`✅ Got reply (${reply.length} chars)`);
+        passed++;
+      } else {
+        console.log('❌ Timed out');
+      }
     }
   }
 

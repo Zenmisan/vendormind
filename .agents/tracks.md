@@ -6,6 +6,7 @@
 
 ## Completed Tracks
 
+- [routing-and-auth-fixes](tracks/routing_and_auth_fixes_20260714/) — Routing & WhatsApp Auth fixes: Fixed JID phone formatting symbols (+), added robust Baileys auth state checks, ignored group/newsletter chats at connection-level, and resolved keep-alive ping URL routing.
 - [pwa](tracks/pwa_20260707/) — PWA: installable on mobile + desktop, manifest, service worker, icons, offline cache
 - [conversation-filters](tracks/conversation_filters_20260707/) — Conversation Filters & Stand-down: Added recursive WhatsApp message formatting parsing and LLM classifier to stand down on casual personal/friend chats.
 - [link-previews](tracks/link_previews_20260707/) — Link Previews (Open Graph Metadata): Added Open Graph and Twitter Card tags to index.html using the logo image for rich preview embeds.
