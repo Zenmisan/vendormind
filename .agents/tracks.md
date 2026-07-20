@@ -2,9 +2,11 @@
 
 ## Active Tracks
 
-- [landing-and-legal-pages-upgrade](tracks/landing_and_legal_pages_upgrade_20260720/) — Landing & Legal Pages Upgrade: Purge Nomba copy, add stylish contact form, and expand comprehensive Terms and Privacy Policy.
+*(none)*
 
 ## Completed Tracks
+
+- [landing-and-legal-pages-upgrade](tracks/landing_and_legal_pages_upgrade_20260720/) — Landing & Legal Pages Upgrade: Purge Nomba copy, add stylish contact form, and expand comprehensive Terms and Privacy Policy.
 
 - [whatsapp-delivery-and-smart-filter](tracks/whatsapp_delivery_and_smart_filter_20260720/) — WhatsApp Delivery & Smart Filter: WebSocket connection state checks, manual message DB creation, and smart customer classifier to ignore personal chit-chat.
 - [monnify-migration](tracks/monnify_migration_20260720/) — Monnify Payment Gateway Migration: Replace Nomba payment provider with Monnify for transaction initialization, webhook signatures, and wallet top-ups.
