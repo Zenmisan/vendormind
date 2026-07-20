@@ -2,9 +2,11 @@
 
 ## Active Tracks
 
-- [monnify-migration](tracks/monnify_migration_20260720/) — Monnify Payment Gateway Migration: Replace Nomba payment provider with Monnify for transaction initialization, webhook signatures, and wallet top-ups.
+*(none)*
 
 ## Completed Tracks
+
+- [monnify-migration](tracks/monnify_migration_20260720/) — Monnify Payment Gateway Migration: Replace Nomba payment provider with Monnify for transaction initialization, webhook signatures, and wallet top-ups.
 
 - [routing-and-auth-fixes](tracks/routing_and_auth_fixes_20260714/) — Routing & WhatsApp Auth fixes: Fixed JID phone formatting symbols (+), added robust Baileys auth state checks, ignored group/newsletter chats at connection-level, and resolved keep-alive ping URL routing.
 - [pwa](tracks/pwa_20260707/) — PWA: installable on mobile + desktop, manifest, service worker, icons, offline cache
