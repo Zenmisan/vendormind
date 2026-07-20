@@ -504,6 +504,15 @@ const start = async () => {
       return reply.status(404).send({ error: 'Customer not found' });
     }
 
+    await prisma.message.create({
+      data: {
+        vendorId,
+        customerId,
+        sender: 'VENDOR',
+        content: content.trim()
+      }
+    });
+
     await outboundQueue.add(`reply:manual:${Date.now()}`, {
       vendorId: vendorId.toString(),
       remoteJid: `${customer.phoneNumber}@s.whatsapp.net`,
