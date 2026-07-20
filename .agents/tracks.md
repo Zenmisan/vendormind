@@ -2,10 +2,11 @@
 
 ## Active Tracks
 
-- [whatsapp-delivery-and-smart-filter](tracks/whatsapp_delivery_and_smart_filter_20260720/) — WhatsApp Delivery & Smart Filter: WebSocket connection state checks, manual message DB creation, and smart customer classifier to ignore personal chit-chat.
+*(none)*
 
 ## Completed Tracks
 
+- [whatsapp-delivery-and-smart-filter](tracks/whatsapp_delivery_and_smart_filter_20260720/) — WhatsApp Delivery & Smart Filter: WebSocket connection state checks, manual message DB creation, and smart customer classifier to ignore personal chit-chat.
 - [monnify-migration](tracks/monnify_migration_20260720/) — Monnify Payment Gateway Migration: Replace Nomba payment provider with Monnify for transaction initialization, webhook signatures, and wallet top-ups.
 
 - [routing-and-auth-fixes](tracks/routing_and_auth_fixes_20260714/) — Routing & WhatsApp Auth fixes: Fixed JID phone formatting symbols (+), added robust Baileys auth state checks, ignored group/newsletter chats at connection-level, and resolved keep-alive ping URL routing.
