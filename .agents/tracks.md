@@ -2,9 +2,11 @@
 
 ## Active Tracks
 
-- [scroll-to-top-fix](tracks/scroll_to_top_fix_20260720/) — Scroll-to-Top Route Navigation Fix: Automatically reset window scroll position to top (0, 0) on React Router navigation.
+*(none)*
 
 ## Completed Tracks
+
+- [scroll-to-top-fix](tracks/scroll_to_top_fix_20260720/) — Scroll-to-Top Route Navigation Fix: Automatically reset window scroll position to top (0, 0) on React Router navigation.
 
 - [landing-and-legal-pages-upgrade](tracks/landing_and_legal_pages_upgrade_20260720/) — Landing & Legal Pages Upgrade: Purge Nomba copy, add stylish contact form, and expand comprehensive Terms and Privacy Policy.
 

@@ -105,10 +105,11 @@ Add credit to a vendor wallet.
 
 ## Webhooks
 
-### POST /webhooks/nomba
-Receives Nomba payment events. Signature verified with the configured Nomba webhook secret.
+### POST /webhooks/monnify
 
-Set this URL in the Nomba dashboard webhook settings.
+Receives Monnify payment events. Signature verified with the configured Monnify secret key (`monnify-signature`).
+
+Set this URL (`https://vm-gateway.onrender.com/webhooks/monnify`) in the Monnify dashboard webhook settings.
 
 **Event handled**: `payment_success`
 
