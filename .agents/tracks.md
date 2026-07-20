@@ -2,7 +2,7 @@
 
 ## Active Tracks
 
-*(none)*
+- [whatsapp-delivery-and-smart-filter](tracks/whatsapp_delivery_and_smart_filter_20260720/) — WhatsApp Delivery & Smart Filter: WebSocket connection state checks, manual message DB creation, and smart customer classifier to ignore personal chit-chat.
 
 ## Completed Tracks
 

@@ -13,13 +13,12 @@ export class AgentService {
       include: { cart: { include: { items: true } } }
     });
     const hasCartItems = (customerRecord?.cart?.items?.length ?? 0) > 0;
-    const hasActiveSession = context.recentMessages.length > 0 || hasCartItems;
 
-    if (!hasActiveSession) {
-      const isBusiness = await this.isBusinessConversation(text);
-      if (!isBusiness) {
-        return '__STAND_DOWN__';
-      }
+    // Smart Filter: Always classify incoming message to differentiate business/customer queries vs casual/personal chit-chat
+    const isBusiness = await this.isBusinessConversation(text);
+    if (!isBusiness && !hasCartItems) {
+      console.log(`🤖 Standing down on personal/casual message for customer ${customerId}: "${text}"`);
+      return '__STAND_DOWN__';
     }
 
     const messages: Anthropic.MessageParam[] = [
