@@ -13,11 +13,10 @@ Copy `.env` and fill in the values marked required.
 | `ANTHROPIC_API_KEY` | ✅ | — | Claude Sonnet/Haiku — primary LLM + summarization |
 | `GROQ_API_KEY` | ✅ | — | Groq Whisper (voice transcription) + Llama fallback LLM |
 | `GEMINI_API_KEY` | | — | Gemini fallback LLM (optional) |
-| `NOMBA_CLIENT_ID` | | — | Nomba API client ID for checkout |
-| `NOMBA_CLIENT_SECRET` | | — | Nomba API client secret for checkout |
-| `NOMBA_ACCOUNT_ID` | | — | Nomba account ID used when creating checkout orders |
-| `NOMBA_WEBHOOK_SECRET` | | — | Nomba webhook secret for signature verification |
-| `NOMBA_BASE_URL` | | `https://api.nomba.com` | Nomba API base URL |
+| `MONNIFY_API_KEY` | Yes | — | Monnify API key for checkout initialization |
+| `MONNIFY_SECRET_KEY` | Yes | — | Monnify secret key for webhook HMAC verification |
+| `MONNIFY_CONTRACT_CODE` | Yes | — | Monnify merchant contract code |
+| `MONNIFY_BASE_URL` | No | `https://sandbox.monnify.com` | Monnify API base URL (`https://api.monnify.com` in prod) |
 | `OPENAI_API_KEY` | | — | OpenAI embeddings (`text-embedding-3-small`) — required for pgvector search |
 | `SMTP_HOST` | | — | SMTP server for wallet warning emails (not yet implemented) |
 | `SMTP_USER` | | — | SMTP username |
