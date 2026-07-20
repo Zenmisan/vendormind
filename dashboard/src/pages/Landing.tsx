@@ -15,7 +15,7 @@ import { useAuth } from '../lib/AuthContext';
 const features = [
   { Icon: Bot,       title: 'Claude AI Agent',        desc: 'Understands product questions, remembers context, builds carts, and handles checkout from chat.',        color: '#6366f1', bg: 'rgba(99,102,241,0.08)' },
   { Icon: Mic,       title: 'Voice Notes',             desc: 'Customers can send voice notes. Groq Whisper transcribes them so ordering still feels natural.',        color: '#f59e0b', bg: 'rgba(245,158,11,0.08)' },
-  { Icon: CreditCard,title: 'Nomba Payments',          desc: 'Create Nomba payment links inside the conversation with stock reserved until checkout expires.',       color: '#16a34a', bg: 'rgba(22,163,74,0.08)'  },
+  { Icon: CreditCard,title: 'Monnify Payments',          desc: 'Create Monnify payment links inside the conversation with stock reserved until checkout expires.',       color: '#16a34a', bg: 'rgba(22,163,74,0.08)'  },
   { Icon: Building2, title: 'Multi-vendor',            desc: 'One platform, multiple stores. Each vendor gets isolated data and their own WhatsApp number.',         color: '#3b82f6', bg: 'rgba(59,130,246,0.08)' },
   { Icon: Search,    title: 'Semantic Search',         desc: 'pgvector similarity search finds the right product even when customers describe it vaguely.',          color: '#ec4899', bg: 'rgba(236,72,153,0.08)' },
   { Icon: Brain,     title: 'Conversation Memory',     desc: 'Rolling summaries keep context across long chats without exploding token costs.',                     color: '#14b8a6', bg: 'rgba(20,184,166,0.08)' },
@@ -30,7 +30,7 @@ const steps = [
 const painPoints = [
   { Icon: Clock3, title: 'Slow replies lose ready buyers', desc: 'Customers often ask about price, size, delivery, and payment while you are packing orders or away from your phone.' },
   { Icon: MessageCircle, title: 'Every chat repeats the same questions', desc: 'VendorMind answers product, delivery, and policy questions from your catalog and uploaded documents.' },
-  { Icon: WalletCards, title: 'Checkout is too manual', desc: 'The agent creates the order, reserves stock, and sends a Nomba payment link without a back-and-forth handoff.' },
+  { Icon: WalletCards, title: 'Checkout is too manual', desc: 'The agent creates the order, reserves stock, and sends a Monnify payment link without a back-and-forth handoff.' },
 ];
 
 const audiences = [
@@ -46,7 +46,7 @@ const launchSignals = [
   { value: '3 steps', label: 'Register, upload catalog, scan QR' },
   { value: '24/7',    label: 'AI replies while you are busy' },
   { value: '30 min',  label: 'Stock reserved during checkout' },
-  { value: 'Nomba',   label: 'Payment links built into chat' },
+  { value: 'Monnify', label: 'Payment links built into chat' },
 ];
 
 const pricing = [
@@ -54,14 +54,14 @@ const pricing = [
   ['Outbound reply',     '₦0.50'],
   ['AI response',        '₦25.00'],
   ['Catalog upload',     'Free'],
-  ['Nomba payment link', 'Free'],
+  ['Monnify payment link', 'Free'],
 ];
 
 const faqs = [
   ['Do I need a new WhatsApp number?', 'No. You can connect the WhatsApp number you want customers to message by scanning a QR code during onboarding.'],
   ['Can I upload Excel or CSV files?', 'Yes. VendorMind accepts catalog files with product names, prices, descriptions, and stock levels.'],
   ['What happens when stock runs out?', 'The agent checks available stock before adding products to cart and before checkout, so customers are not sold unavailable items.'],
-  ['How does payment work?', 'When a customer is ready to pay, VendorMind creates an order and sends a Nomba payment link directly inside WhatsApp.'],
+  ['How does payment work?', 'When a customer is ready to pay, VendorMind creates an order and sends a Monnify payment link directly inside WhatsApp.'],
   ['Can a human take over?', 'Yes. The agent can hand off conversations when a customer needs support beyond automation.'],
   ['What if my wallet balance is low?', 'The wallet system includes warning states and an overdraft buffer designed to finish active conversations gracefully.'],
 ];
@@ -232,7 +232,7 @@ export default function Landing() {
 
             <p style={{ fontSize: '1.05rem', color: 'var(--text-2)', lineHeight: 1.65, margin: '0 0 2rem', maxWidth: 440 }}>
               VendorMind gives your business an AI sales agent that answers customers,
-              recommends products, creates carts, and sends Nomba payment links on WhatsApp.
+              recommends products, creates carts, and sends Monnify payment links on WhatsApp.
             </p>
 
             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -275,7 +275,7 @@ export default function Landing() {
                   { me: true,  text: 'Hi! Do you have jollof rice?' },
                   { me: false, text: 'Yes! Party Jollof Rice (₦2,500) and Small Chops Combo (₦3,000). Want to add any to your cart?' },
                   { me: true,  text: 'Add jollof rice and checkout' },
-                  { me: false, text: 'Order created! Total: ₦2,500\n\nPay here → checkout.nomba.com/...\nLink expires in 30 min' },
+                  { me: false, text: 'Order created! Total: ₦2,500\n\nPay here → sandbox.monnify.com/checkout/...\nLink expires in 30 min' },
                 ].map((msg, i) => (
                   <div key={i} style={{ display: 'flex', justifyContent: msg.me ? 'flex-end' : 'flex-start', animation: `fadeUp 0.4s ${i * 0.1}s both` }}>
                     <div className={msg.me ? 'chat-bubble-user' : 'chat-bubble-bot'} style={{

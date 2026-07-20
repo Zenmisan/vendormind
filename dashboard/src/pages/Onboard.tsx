@@ -658,7 +658,7 @@ export default function Onboard() {
                     ) : (
                       <CreditCard size={15} />
                     )}
-                    Top-up ₦2,000 (Nomba Checkout)
+                    Top-up ₦2,000 (Monnify Checkout)
                   </button>
 
                   <button

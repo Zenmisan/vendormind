@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { SessionContext } from './context.service';
 import { prisma } from './prisma/client';
 import { AIService } from './ai.service';
-import { NombaService } from './nomba.service';
+import { MonnifyService } from './monnify.service';
 import { releaseQueue } from './queue';
 import { redisConnection } from './redis';
 
@@ -293,20 +293,16 @@ When the customer is ready to pay, call generatePaymentLink. If they need human 
       const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
       await prisma.softReservation.create({ data: { orderId: order.id, expiresAt } });
 
-      // Initialize Nomba checkout
+      // Initialize Monnify checkout
       let paymentUrl = '';
       try {
-        const result = await NombaService.createCheckoutOrder({
-          amountNGN: total,
-          orderReference: reference,
+        paymentUrl = await MonnifyService.createCheckoutUrl({
+          amount: total,
+          paymentReference: reference,
+          customerName: customer.name || `Customer ${customer.phoneNumber}`,
           customerEmail: `${customer.phoneNumber}@wa.vendormind.app`,
-          customerId: customerId.toString(),
-          metadata: {
-            orderId: order.id.toString(),
-            vendorId: vendorId.toString()
-          }
+          paymentDescription: `Order #${order.id}`
         });
-        paymentUrl = result.checkoutLink;
         await prisma.order.update({ where: { id: order.id }, data: { paymentLink: paymentUrl } });
       } catch (err: any) {
         paymentUrl = `[Payment unavailable: ${err.message}]`;

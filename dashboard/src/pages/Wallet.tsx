@@ -58,7 +58,7 @@ export default function WalletPage() {
       if (res.ok) {
         const payload = await res.json() as { checkoutUrl?: string; newBalance?: number; mode?: string };
         if (payload.checkoutUrl) {
-          // Real Nomba checkout — redirect vendor to payment page
+          // Real Monnify checkout — redirect vendor to payment page
           window.location.href = payload.checkoutUrl;
           return;
         }
@@ -248,7 +248,7 @@ export default function WalletPage() {
                   ) : (
                     <CreditCard size={15} />
                   )}
-                  {topUpLoading ? 'Initializing Top-up...' : 'Pay via Nomba Checkout'}
+                  {topUpLoading ? 'Initializing Top-up...' : 'Pay via Monnify Checkout'}
                 </button>
               </form>
             </div>

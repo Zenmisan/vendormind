@@ -2,7 +2,7 @@
 
 ## Active Tracks
 
-*(none)*
+- [monnify-migration](tracks/monnify_migration_20260720/) — Monnify Payment Gateway Migration: Replace Nomba payment provider with Monnify for transaction initialization, webhook signatures, and wallet top-ups.
 
 ## Completed Tracks
 

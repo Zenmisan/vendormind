@@ -134,7 +134,7 @@ export default function Orders() {
 
   const getPaymentStatusText = (status: OrderStatus) => {
     if (status === 'PENDING') return 'Awaiting payment';
-    if (status === 'PAID') return 'Paid via Nomba';
+    if (status === 'PAID') return 'Paid via Monnify';
     if (status === 'DELIVERED') return 'Fulfilled';
     return 'Expired / Cancelled';
   };

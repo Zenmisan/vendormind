@@ -6,9 +6,9 @@ const content = {
     title: 'Privacy Policy',
     kicker: 'How VendorMind handles business and customer data.',
     sections: [
-      ['Data we collect', 'VendorMind stores vendor account details, product catalogs, WhatsApp customer identifiers, conversations needed to run the sales agent, orders, wallet activity, and payment metadata from Nomba.'],
+      ['Data we collect', 'VendorMind stores vendor account details, product catalogs, WhatsApp customer identifiers, conversations needed to run the sales agent, orders, wallet activity, and payment metadata from Monnify.'],
       ['How we use data', 'We use this data to answer customer questions, manage carts and orders, reserve stock, send payment links, provide support, and improve platform reliability.'],
-      ['Payment data', 'VendorMind does not store card details. Payments are completed through Nomba-hosted checkout links.'],
+      ['Payment data', 'VendorMind does not store card details. Payments are completed through Monnify-hosted checkout links.'],
       ['Contact', 'For privacy questions, contact hello@vendormind.app.'],
     ],
   },
@@ -18,7 +18,7 @@ const content = {
     sections: [
       ['Service use', 'VendorMind helps vendors automate WhatsApp sales workflows. Vendors are responsible for their product information, pricing, fulfilment, refunds, and customer promises.'],
       ['Wallet and usage', 'Usage may be charged from a prepaid wallet according to the active pricing shown in the product. Low or negative balances may pause automation.'],
-      ['Payments', 'Payment links are powered by Nomba. Vendors are responsible for reconciling payouts and handling disputes with customers.'],
+      ['Payments', 'Payment links are powered by Monnify. Vendors are responsible for reconciling payouts and handling disputes with customers.'],
       ['Contact', 'For terms questions, contact hello@vendormind.app.'],
     ],
   },

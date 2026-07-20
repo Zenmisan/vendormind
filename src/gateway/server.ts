@@ -6,7 +6,7 @@ import multipart from '@fastify/multipart';
 import * as XLSX from 'xlsx';
 import { prisma } from '../shared/prisma/client';
 import { inboundQueue, outboundQueue, embedQueue, EmbedProductJob } from '../shared/queue';
-import { NombaService } from '../shared/nomba.service';
+import { MonnifyService } from '../shared/monnify.service';
 import { redisConnection } from '../shared/redis';
 import { ContextService } from '../shared/context.service';
 
@@ -149,7 +149,7 @@ const start = async () => {
     return { newBalance: Number(vendor.walletBalance) };
   });
 
-  // ── Wallet Top-up via Nomba Checkout ──────────────────────────────
+  // ── Wallet Top-up via Monnify Checkout ─────────────────────────────
   fastify.post<{ Params: { id: string }; Body: { amount: number } }>('/vendors/:id/wallet/topup', async (request, reply) => {
     let vendorId: bigint;
     try { vendorId = BigInt(request.params.id); }
@@ -158,12 +158,12 @@ const start = async () => {
     const { amount } = request.body;
     if (!amount || amount <= 0) return reply.status(400).send({ error: 'Invalid amount' });
 
-    const vendor = await prisma.vendor.findUnique({ where: { id: vendorId }, select: { email: true } });
+    const vendor = await prisma.vendor.findUnique({ where: { id: vendorId }, select: { name: true, email: true } });
     if (!vendor) return reply.status(404).send({ error: 'Vendor not found' });
 
-    const nombaConfigured = !!(process.env.NOMBA_CLIENT_ID && process.env.NOMBA_CLIENT_SECRET && process.env.NOMBA_ACCOUNT_ID);
+    const monnifyConfigured = !!(process.env.MONNIFY_API_KEY && process.env.MONNIFY_SECRET_KEY && process.env.MONNIFY_CONTRACT_CODE);
 
-    if (!nombaConfigured) {
+    if (!monnifyConfigured) {
       // Dev fallback: direct credit
       const updated = await prisma.vendor.update({
         where: { id: vendorId },
@@ -172,18 +172,19 @@ const start = async () => {
       return { mode: 'mock', newBalance: Number(updated.walletBalance) };
     }
 
-    const orderReference = `TOPUP-${request.params.id}-${Date.now()}`;
-    const callbackUrl = `${process.env.APP_URL || 'https://vendormind-z.web.app'}/wallet`;
+    const paymentReference = `TOPUP-${request.params.id}-${Date.now()}`;
+    const redirectUrl = `${process.env.APP_URL || 'https://vendormind-z.web.app'}/wallet`;
 
-    const result = await NombaService.createCheckoutOrder({
-      amountNGN: amount,
-      orderReference,
-      callbackUrl,
+    const checkoutUrl = await MonnifyService.createCheckoutUrl({
+      amount,
+      paymentReference,
+      redirectUrl,
+      customerName: vendor.name || 'VendorMind Merchant',
       customerEmail: vendor.email,
-      metadata: { type: 'WALLET_TOPUP', vendorId: request.params.id, amount: String(amount) }
+      paymentDescription: `VendorMind Wallet Top-up ₦${amount}`
     });
 
-    return { checkoutUrl: result.checkoutLink, orderReference: result.orderReference };
+    return { checkoutUrl, paymentReference };
   });
 
   // ── Catalog Embedding Progress ────────────────────────────────────
@@ -656,7 +657,7 @@ const start = async () => {
     };
   });
 
-  // ── Nomba Webhook ─────────────────────────────────────────────────
+  // ── Monnify Webhook ────────────────────────────────────────────────
   // Parse JSON globally but stash raw string on request for HMAC verification
   fastify.addContentTypeParser('application/json', { parseAs: 'string' }, (req, body: string, done) => {
     (req as any).rawBody = body;
@@ -667,48 +668,53 @@ const start = async () => {
     }
   });
 
-  fastify.post('/webhooks/nomba', async (request, reply) => {
+  fastify.post('/webhooks/monnify', async (request, reply) => {
     const rawBody = (request as any).rawBody as string;
-    // Confirm exact header name in Nomba dashboard if verification fails
-    const signature = request.headers['x-nomba-signature'] as string;
+    const signature = (request.headers['monnify-signature'] || request.headers['x-monnify-signature']) as string;
 
-    if (!NombaService.verifyWebhookSignature(rawBody, signature)) {
+    if (!MonnifyService.verifyWebhookSignature(rawBody, signature)) {
       return reply.status(400).send({ error: 'Invalid signature' });
     }
 
-    const event = request.body as any;
+    const payload = request.body as any;
+    const eventType = payload?.eventType;
+    const eventData = payload?.eventData || {};
 
-    // Nomba sends payment_success event
-    if (event.event === 'payment_success') {
-      const orderMetaData = event.data?.orderMetaData ?? {};
+    if (eventType === 'SUCCESSFUL_TRANSACTION' && (eventData.paymentStatus === 'PAID' || eventData.paymentStatus === 'SUCCESSFUL')) {
+      const paymentReference = eventData.paymentReference as string;
+      const amountPaid = Number(eventData.amountPaid || eventData.totalPayable || 0);
 
       // Wallet top-up payment
-      if (orderMetaData?.type === 'WALLET_TOPUP') {
-        const vendorId = BigInt(orderMetaData.vendorId);
-        const amount = Number(orderMetaData.amount);
-        await prisma.vendor.update({
-          where: { id: vendorId },
-          data: { walletBalance: { increment: amount } }
-        });
-        console.log(`💳 Wallet top-up: vendor ${orderMetaData.vendorId} +₦${amount}`);
-        return reply.status(200).send({ received: true });
+      if (paymentReference && paymentReference.startsWith('TOPUP-')) {
+        const parts = paymentReference.split('-');
+        const vendorIdStr = parts[1];
+        if (vendorIdStr) {
+          const vendorId = BigInt(vendorIdStr);
+          await prisma.vendor.update({
+            where: { id: vendorId },
+            data: { walletBalance: { increment: amountPaid } }
+          });
+          console.log(`💳 Wallet top-up via Monnify: vendor ${vendorIdStr} +₦${amountPaid}`);
+          return reply.status(200).send({ received: true });
+        }
       }
 
-      const orderReference = event.data?.order?.orderId ?? event.data?.transaction?.reference;
-      const orderId = orderMetaData?.orderId ? BigInt(orderMetaData.orderId) : null;
-      const reference = orderReference as string;
-
-      if (!orderId) return reply.status(200).send({ received: true });
-
-      const order = await prisma.order.findUnique({
-        where: { id: orderId },
+      // Order payment
+      const order = await prisma.order.findFirst({
+        where: {
+          OR: [
+            { paymentLink: paymentReference },
+            { paymentLink: eventData.transactionReference }
+          ]
+        },
         include: { items: { include: { product: true } }, customer: true }
       });
 
       if (!order || order.status !== 'PENDING') return reply.status(200).send({ received: true });
+      const orderId = order.id;
 
       // Mark order paid
-      await prisma.order.update({ where: { id: orderId }, data: { status: 'PAID', paymentLink: reference } });
+      await prisma.order.update({ where: { id: orderId }, data: { status: 'PAID' } });
 
       // Release reserved stock
       for (const item of order.items) {
@@ -735,7 +741,7 @@ const start = async () => {
         content: `Payment confirmed! Thank you.\n\nOrder #${orderId}\n${itemsList}\n\nTotal: ₦${Number(order.total).toFixed(2)}\n\nYour order is being prepared.`
       });
 
-      console.log(`✅ Order ${orderId} marked PAID, receipt queued`);
+      console.log(`✅ Order ${orderId} marked PAID via Monnify, receipt queued`);
     }
 
     return reply.status(200).send({ received: true });

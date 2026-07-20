@@ -236,7 +236,7 @@ export default function Dashboard() {
               <h2 style={{ fontSize: '0.95rem', fontWeight: 800, margin: '0 0 1rem' }}>Next setup actions</h2>
               {[
                 { Icon: Package, text: 'Upload or refresh catalog', path: '/products' },
-                { Icon: CreditCard, text: 'Confirm Nomba checkout settings', path: '/wallet' },
+                { Icon: CreditCard, text: 'Confirm Monnify checkout settings', path: '/wallet' },
                 { Icon: ShoppingBag, text: 'Review order fulfilment flow', path: '/orders' },
               ].map(({ Icon, text, path }) => (
                 <div
