@@ -11,10 +11,13 @@ import Wallet from './pages/Wallet';
 import Settings from './pages/Settings';
 import LegalPage from './pages/LegalPage';
 
+import ScrollToTop from './lib/ScrollToTop';
+
 export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <ScrollToTop />
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/privacy" element={<LegalPage kind="privacy" />} />

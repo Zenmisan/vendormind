@@ -2,7 +2,7 @@
 
 ## Active Tracks
 
-*(none)*
+- [scroll-to-top-fix](tracks/scroll_to_top_fix_20260720/) — Scroll-to-Top Route Navigation Fix: Automatically reset window scroll position to top (0, 0) on React Router navigation.
 
 ## Completed Tracks
 

@@ -1,0 +1,151 @@
+E0720 20:49:20.710156   61492 dev.go:80] Failed to load initial config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:49:20.710481   61492 watch.go:116] watchAllDir unable to walk dir `/home/zenmi/Projects/manga-dl/dataconnect`: lstat /home/zenmi/Projects/manga-dl/dataconnect: no such file or directory
+I0720 20:49:20.711437   61492 dev.go:101] Listening on address (HTTP + gRPC): 127.0.0.1:50001
+E0720 20:49:30.893181   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:49:40.723180   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:49:50.711513   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:50:00.719243   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:50:10.727764   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:50:20.711419   61492 watch.go:116] watchAllDir unable to walk dir `/home/zenmi/Projects/manga-dl/dataconnect`: lstat /home/zenmi/Projects/manga-dl/dataconnect: no such file or directory
+E0720 20:50:20.711504   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:50:30.720642   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:50:40.719720   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:50:50.712150   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:51:00.720235   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:51:10.720247   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:51:20.711428   61492 watch.go:116] watchAllDir unable to walk dir `/home/zenmi/Projects/manga-dl/dataconnect`: lstat /home/zenmi/Projects/manga-dl/dataconnect: no such file or directory
+E0720 20:51:20.711514   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:51:30.713825   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:51:40.719215   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:51:50.711510   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:52:00.719323   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:52:10.720281   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:52:20.711379   61492 watch.go:116] watchAllDir unable to walk dir `/home/zenmi/Projects/manga-dl/dataconnect`: lstat /home/zenmi/Projects/manga-dl/dataconnect: no such file or directory
+E0720 20:52:20.711433   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:52:30.720258   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:52:40.720232   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:52:50.711683   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:53:00.720235   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:53:10.721042   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:53:20.711410   61492 watch.go:116] watchAllDir unable to walk dir `/home/zenmi/Projects/manga-dl/dataconnect`: lstat /home/zenmi/Projects/manga-dl/dataconnect: no such file or directory
+E0720 20:53:20.711491   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:53:30.719914   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:53:40.711023   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:53:50.711669   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:54:00.719250   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:54:10.720273   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:54:20.711661   61492 watch.go:116] watchAllDir unable to walk dir `/home/zenmi/Projects/manga-dl/dataconnect`: lstat /home/zenmi/Projects/manga-dl/dataconnect: no such file or directory
+E0720 20:54:20.711865   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:54:30.720019   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:54:40.715394   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:54:50.710806   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:55:00.719314   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:55:10.720295   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:55:20.711366   61492 watch.go:116] watchAllDir unable to walk dir `/home/zenmi/Projects/manga-dl/dataconnect`: lstat /home/zenmi/Projects/manga-dl/dataconnect: no such file or directory
+E0720 20:55:20.711447   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:55:30.720245   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:55:40.720232   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:55:50.710782   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:56:00.720232   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:56:10.720252   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:56:20.710918   61492 watch.go:116] watchAllDir unable to walk dir `/home/zenmi/Projects/manga-dl/dataconnect`: lstat /home/zenmi/Projects/manga-dl/dataconnect: no such file or directory
+E0720 20:56:20.710998   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:56:30.719522   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:56:40.720333   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:56:50.711509   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:57:00.720426   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:57:10.720230   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:57:20.711418   61492 watch.go:116] watchAllDir unable to walk dir `/home/zenmi/Projects/manga-dl/dataconnect`: lstat /home/zenmi/Projects/manga-dl/dataconnect: no such file or directory
+E0720 20:57:20.711481   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:57:30.720288   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:57:40.720253   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:57:50.711309   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:58:00.711323   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:58:10.720228   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:58:20.710784   61492 watch.go:116] watchAllDir unable to walk dir `/home/zenmi/Projects/manga-dl/dataconnect`: lstat /home/zenmi/Projects/manga-dl/dataconnect: no such file or directory
+E0720 20:58:20.710867   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:58:30.719225   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:58:40.720160   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:58:50.711572   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:59:00.719385   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:59:10.713064   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:59:20.711394   61492 watch.go:116] watchAllDir unable to walk dir `/home/zenmi/Projects/manga-dl/dataconnect`: lstat /home/zenmi/Projects/manga-dl/dataconnect: no such file or directory
+E0720 20:59:20.711465   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:59:30.720267   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:59:40.721355   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 20:59:50.710804   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:00:00.711313   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:00:10.710832   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:00:20.711619   61492 watch.go:116] watchAllDir unable to walk dir `/home/zenmi/Projects/manga-dl/dataconnect`: lstat /home/zenmi/Projects/manga-dl/dataconnect: no such file or directory
+E0720 21:00:20.711735   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:00:30.719471   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:00:40.720248   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:00:50.711425   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:01:00.720238   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:01:10.720334   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:01:20.711259   61492 watch.go:116] watchAllDir unable to walk dir `/home/zenmi/Projects/manga-dl/dataconnect`: lstat /home/zenmi/Projects/manga-dl/dataconnect: no such file or directory
+E0720 21:01:20.711345   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:01:30.720363   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:01:40.719229   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:01:50.711438   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:02:00.722290   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:02:10.710772   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:02:20.713125   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:02:20.712849   61492 watch.go:116] watchAllDir unable to walk dir `/home/zenmi/Projects/manga-dl/dataconnect`: lstat /home/zenmi/Projects/manga-dl/dataconnect: no such file or directory
+E0720 21:02:30.775834   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:02:40.720253   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:02:50.711221   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:03:00.720239   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:03:10.721352   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:03:20.711670   61492 watch.go:116] watchAllDir unable to walk dir `/home/zenmi/Projects/manga-dl/dataconnect`: lstat /home/zenmi/Projects/manga-dl/dataconnect: no such file or directory
+E0720 21:03:20.711712   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:03:30.719266   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:03:40.720513   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:03:50.713051   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:04:00.719434   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:04:10.710909   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:04:20.711519   61492 watch.go:116] watchAllDir unable to walk dir `/home/zenmi/Projects/manga-dl/dataconnect`: lstat /home/zenmi/Projects/manga-dl/dataconnect: no such file or directory
+E0720 21:04:20.711597   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:04:30.720230   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:04:40.720207   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:04:50.711494   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:05:00.720434   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:05:10.720532   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:05:20.711677   61492 watch.go:116] watchAllDir unable to walk dir `/home/zenmi/Projects/manga-dl/dataconnect`: lstat /home/zenmi/Projects/manga-dl/dataconnect: no such file or directory
+E0720 21:05:20.711838   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:05:30.719938   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:05:40.720252   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:05:50.711669   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:06:00.719265   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:06:10.721535   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:06:20.710818   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:06:20.710752   61492 watch.go:116] watchAllDir unable to walk dir `/home/zenmi/Projects/manga-dl/dataconnect`: lstat /home/zenmi/Projects/manga-dl/dataconnect: no such file or directory
+E0720 21:06:30.720465   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:06:40.719393   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:06:50.711516   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:07:00.720256   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:07:10.720385   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:07:20.711396   61492 watch.go:116] watchAllDir unable to walk dir `/home/zenmi/Projects/manga-dl/dataconnect`: lstat /home/zenmi/Projects/manga-dl/dataconnect: no such file or directory
+E0720 21:07:20.711475   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:07:30.720291   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:07:40.723105   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:07:50.711511   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:08:00.720252   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:08:10.720341   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:08:20.710885   61492 watch.go:116] watchAllDir unable to walk dir `/home/zenmi/Projects/manga-dl/dataconnect`: lstat /home/zenmi/Projects/manga-dl/dataconnect: no such file or directory
+E0720 21:08:20.820239   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:08:30.710742   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:08:40.720267   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:08:50.710825   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:09:00.719250   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:09:10.720263   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:09:20.711336   61492 watch.go:116] watchAllDir unable to walk dir `/home/zenmi/Projects/manga-dl/dataconnect`: lstat /home/zenmi/Projects/manga-dl/dataconnect: no such file or directory
+E0720 21:09:20.711370   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:09:30.720316   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:09:40.720273   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:09:50.711635   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:10:00.721227   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:10:10.720265   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:10:20.711440   61492 watch.go:116] watchAllDir unable to walk dir `/home/zenmi/Projects/manga-dl/dataconnect`: lstat /home/zenmi/Projects/manga-dl/dataconnect: no such file or directory
+E0720 21:10:20.711523   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
+E0720 21:10:30.711666   61492 watch.go:40] Failed to load config from "/home/zenmi/Projects/manga-dl/dataconnect": could not find dataconnect.yaml in `/home/zenmi/Projects/manga-dl/dataconnect`
