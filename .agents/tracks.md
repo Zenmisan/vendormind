@@ -2,7 +2,7 @@
 
 ## Active Tracks
 
-*(none)*
+- [landing-and-legal-pages-upgrade](tracks/landing_and_legal_pages_upgrade_20260720/) — Landing & Legal Pages Upgrade: Purge Nomba copy, add stylish contact form, and expand comprehensive Terms and Privacy Policy.
 
 ## Completed Tracks
 
