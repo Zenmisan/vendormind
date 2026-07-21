@@ -332,8 +332,20 @@ const start = async () => {
   // ── WhatsApp QR Proxy ─────────────────────────────────────────────────
   fastify.get<{ Params: { id: string } }>('/vendors/:id/whatsapp/qr', async (request) => {
     const vendorId = BigInt(request.params.id);
+
+    // Check if auth credentials session exists (connected state)
+    const credsSession = await prisma.whatsAppSession.findFirst({
+      where: { vendorId, sessionId: `${request.params.id}:creds` }
+    });
+    if (credsSession) {
+      const credsData = credsSession.data as any;
+      if (credsData?.me?.id || credsData?.registered) {
+        return { status: 'connected' };
+      }
+    }
+
     const session = await prisma.whatsAppSession.findFirst({
-      where: { vendorId, sessionId: { contains: ':qr' } },
+      where: { vendorId, sessionId: `${request.params.id}:qr` },
       orderBy: { updatedAt: 'desc' }
     });
     if (!session) return { status: 'waiting' };
@@ -392,8 +404,20 @@ const start = async () => {
   // ── Get Pairing Code ──────────────────────────────────────────────
   fastify.get<{ Params: { id: string } }>('/vendors/:id/whatsapp/pairing-code', async (request) => {
     const vendorId = BigInt(request.params.id);
+
+    // Check if auth credentials session exists (connected state)
+    const credsSession = await prisma.whatsAppSession.findFirst({
+      where: { vendorId, sessionId: `${request.params.id}:creds` }
+    });
+    if (credsSession) {
+      const credsData = credsSession.data as any;
+      if (credsData?.me?.id || credsData?.registered) {
+        return { status: 'connected' };
+      }
+    }
+
     const session = await prisma.whatsAppSession.findFirst({
-      where: { vendorId, sessionId: { contains: ':qr' } },
+      where: { vendorId, sessionId: `${request.params.id}:qr` },
       orderBy: { updatedAt: 'desc' }
     });
     if (!session) return { status: 'waiting' };
