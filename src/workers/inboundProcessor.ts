@@ -6,6 +6,7 @@ import { ContextService } from '../shared/context.service';
 import { AgentService, MockAgentService } from '../shared/agent.service';
 import { BillingService } from '../shared/billing.service';
 import { CircuitBreaker } from '../shared/utils/circuitBreaker';
+import { MonnifyService } from '../shared/monnify.service';
 
 const GRACEFUL_PAUSE_MSG = "I need to pause for a moment — let me get a team member for you! We'll be right with you.";
 
@@ -95,6 +96,32 @@ const worker = new Worker<InboundMessageJob>(
           where: { id: customer.id },
           data: { name: customerName }
         });
+      }
+
+      // 4.1. Auto-generate permanent reserved bank account if none exists
+      if (!customer.reservedAccountNumber && process.env.MONNIFY_API_KEY) {
+        try {
+          const ref = `ACC-${customer.id}-${Date.now()}`;
+          const accInfo = await MonnifyService.createReservedAccount({
+            accountReference: ref,
+            accountName: `VendorMind: ${customer.name || 'Customer'}`,
+            customerEmail: `${customerPhone}@vendormind.app`,
+            customerName: customer.name || 'WhatsApp Customer'
+          });
+          if (accInfo) {
+            customer = await prisma.customer.update({
+              where: { id: customer.id },
+              data: {
+                reservedBankName: accInfo.bankName,
+                reservedAccountNumber: accInfo.accountNumber,
+                reservedAccountReference: ref
+              }
+            });
+            console.log(`🏦 Generated Monnify Reserved Account for Customer ${customer.id}: ${accInfo.bankName} ${accInfo.accountNumber}`);
+          }
+        } catch (err: any) {
+          console.error(`⚠️ Failed to generate reserved account for Customer ${customer.id}:`, err.message);
+        }
       }
 
       // 5. Check handoff flag — if set, skip bot and wait for human

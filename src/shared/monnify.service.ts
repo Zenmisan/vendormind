@@ -114,6 +114,152 @@ export class MonnifyService {
     }
   }
 
+  static async createReservedAccount(options: {
+    accountReference: string;
+    accountName: string;
+    customerEmail: string;
+    customerName: string;
+  }): Promise<{ bankName: string; accountNumber: string } | null> {
+    const baseUrl = this.getBaseUrl();
+    const token = await this.getAccessToken();
+    const contractCode = process.env.MONNIFY_CONTRACT_CODE || '';
+
+    const payload = {
+      accountReference: options.accountReference,
+      accountName: options.accountName,
+      currencyCode: 'NGN',
+      contractCode,
+      customerEmail: options.customerEmail || 'customer@vendormind.app',
+      customerName: options.customerName || 'VendorMind Customer',
+      getAllOneTimeVirtualAccounts: false
+    };
+
+    try {
+      console.log(`🏦 Creating Monnify Reserved Account (Ref: ${options.accountReference})`);
+      const res = await fetch(`${baseUrl}/api/v1/bank-transfer/reserved-accounts`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error(`❌ Monnify Reserved Account Init Error (${res.status}):`, errorText);
+        return null;
+      }
+
+      const body = await res.json() as any;
+      if (body.requestSuccessful && body.responseBody?.accounts?.length > 0) {
+        const primaryAccount = body.responseBody.accounts[0];
+        return {
+          bankName: primaryAccount.bankName,
+          accountNumber: primaryAccount.accountNumber
+        };
+      }
+      return null;
+    } catch (err: any) {
+      console.error('❌ Failed to create Monnify reserved account:', err.message);
+      return null;
+    }
+  }
+
+  static async initiateRefund(options: {
+    transactionReference: string;
+    refundReference: string;
+    amount: number;
+    refundReason: string;
+  }): Promise<{ status: string; refundId?: string } | null> {
+    const baseUrl = this.getBaseUrl();
+    const token = await this.getAccessToken();
+
+    const payload = {
+      transactionReference: options.transactionReference,
+      refundReference: options.refundReference,
+      amount: options.amount,
+      refundReason: options.refundReason,
+      customerNote: `Refund for reference: ${options.transactionReference}`
+    };
+
+    try {
+      console.log(`💸 Initiating Monnify Refund for transaction: ${options.transactionReference}`);
+      const res = await fetch(`${baseUrl}/api/v1/refunds/initiate`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error(`❌ Monnify Refund Error (${res.status}):`, errorText);
+        return null;
+      }
+
+      const body = await res.json() as any;
+      if (body.requestSuccessful && body.responseBody) {
+        return {
+          status: body.responseBody.status || 'SUCCESSFUL',
+          refundId: body.responseBody.refundId
+        };
+      }
+      return null;
+    } catch (err: any) {
+      console.error('❌ Failed to initiate Monnify refund:', err.message);
+      return null;
+    }
+  }
+
+  static async createSubaccount(options: {
+    bankCode: string;
+    accountNumber: string;
+    email: string;
+    subAccountName: string;
+    defaultSplitPercentage?: number;
+  }): Promise<string | null> {
+    const baseUrl = this.getBaseUrl();
+    const token = await this.getAccessToken();
+
+    const payload = {
+      bankCode: options.bankCode,
+      accountNumber: options.accountNumber,
+      email: options.email,
+      subAccountName: options.subAccountName,
+      defaultSplitPercentage: options.defaultSplitPercentage ?? 95.00
+    };
+
+    try {
+      console.log(`👥 Creating Monnify Subaccount for: ${options.subAccountName}`);
+      const res = await fetch(`${baseUrl}/api/v1/subaccounts`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error(`❌ Monnify Subaccount Error (${res.status}):`, errorText);
+        return null;
+      }
+
+      const body = await res.json() as any;
+      if (body.requestSuccessful && body.responseBody?.subAccountCode) {
+        return body.responseBody.subAccountCode;
+      }
+      return null;
+    } catch (err: any) {
+      console.error('❌ Failed to create Monnify subaccount:', err.message);
+      return null;
+    }
+  }
+
   static verifyWebhookSignature(rawBody: string, signature: string): boolean {
     const secretKey = process.env.MONNIFY_SECRET_KEY || '';
     if (!secretKey || !signature) return true;

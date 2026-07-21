@@ -7,7 +7,7 @@ import Sidebar from '../components/Sidebar';
 
 const API = (import.meta as any)?.env?.VITE_API_URL ?? 'http://localhost:3000';
 
-type OrderStatus = 'PENDING' | 'PAID' | 'CANCELED' | 'DELIVERED';
+type OrderStatus = 'PENDING' | 'PAID' | 'CANCELED' | 'DELIVERED' | 'REFUNDED';
 
 interface Order {
   id: string;
@@ -23,6 +23,7 @@ const statusStyle: Record<OrderStatus, { bg: string; color: string; Icon: any }>
   PAID:      { bg: 'rgba(22,163,74,0.1)',   color: '#16a34a', Icon: CheckCircle },
   CANCELED:  { bg: 'rgba(107,114,128,0.1)', color: '#6b7280', Icon: XCircle },
   DELIVERED: { bg: 'rgba(59,130,246,0.1)',  color: '#3b82f6', Icon: Truck },
+  REFUNDED:  { bg: 'rgba(239,68,68,0.1)',   color: '#ef4444', Icon: XCircle },
 };
 
 const sampleOrders: Order[] = [
@@ -94,6 +95,32 @@ export default function Orders() {
       }
     } catch (err) {
       console.error('Failed to update order status:', err);
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  const handleRefundOrder = async () => {
+    if (!selectedOrder) return;
+    if (!window.confirm('Are you sure you want to refund this order? This will reverse the transaction through Monnify.')) return;
+    setUpdatingStatus(true);
+    try {
+      const res = await fetch(`${API}/vendors/${VENDOR_ID}/orders/${selectedOrder.id}/refund`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: 'Merchant initiated refund' })
+      });
+      if (res.ok) {
+        setSelectedOrder(prev => prev ? { ...prev, status: 'REFUNDED' } : null);
+        alert('Refund initialized successfully!');
+        load();
+      } else {
+        const data = await res.json() as any;
+        alert(data.error || 'Failed to refund order');
+      }
+    } catch (err: any) {
+      console.error('Failed to refund order:', err);
+      alert('Network error initiating refund: ' + err.message);
     } finally {
       setUpdatingStatus(false);
     }
@@ -342,6 +369,25 @@ export default function Orders() {
                       >
                         <XCircle size={12} /> Cancel Order
                       </button>
+
+                      {selectedOrder.status === 'PAID' && (
+                        <button
+                          className="btn-ghost"
+                          disabled={updatingStatus}
+                          onClick={handleRefundOrder}
+                          style={{
+                            gridColumn: '1 / span 2',
+                            fontSize: '0.75rem',
+                            padding: '0.5rem',
+                            color: '#ef4444',
+                            borderColor: 'rgba(239,68,68,0.15)',
+                            justifyContent: 'center',
+                            marginTop: '0.25rem'
+                          }}
+                        >
+                          <XCircle size={12} /> Refund Order
+                        </button>
+                      )}
                     </div>
                   </div>
                 ) : (

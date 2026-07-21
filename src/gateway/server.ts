@@ -331,6 +331,55 @@ const start = async () => {
     return { order: { id: order.id.toString(), status: order.status } };
   });
 
+  // ── Refund Order ──────────────────────────────────────────────────
+  fastify.post<{ Params: { id: string, orderId: string }; Body: { reason?: string } }>('/vendors/:id/orders/:orderId/refund', async (request, reply) => {
+    let orderId: bigint;
+    try { orderId = BigInt(request.params.orderId); }
+    catch { return reply.status(400).send({ error: 'Invalid order ID' }); }
+
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: { refunds: true }
+    });
+
+    if (!order) return reply.status(404).send({ error: 'Order not found' });
+    if (order.status !== 'PAID') {
+      return reply.status(400).send({ error: 'Only paid orders can be refunded' });
+    }
+
+    const refundReference = `REF-${orderId}-${Date.now()}`;
+    const amount = Number(order.total);
+
+    const refundResult = await MonnifyService.initiateRefund({
+      transactionReference: order.paymentLink || '',
+      refundReference,
+      amount,
+      refundReason: request.body.reason || 'Requested by vendor'
+    });
+
+    if (!refundResult) {
+      return reply.status(500).send({ error: 'Monnify refund initialization failed' });
+    }
+
+    const refund = await prisma.refund.create({
+      data: {
+        orderId,
+        amount,
+        status: refundResult.status,
+        monnifyRefundId: refundResult.refundId || null,
+        refundReference,
+        reason: request.body.reason || null
+      }
+    });
+
+    await prisma.order.update({
+      where: { id: orderId },
+      data: { status: 'REFUNDED' }
+    });
+
+    return { success: true, refund: { id: refund.id.toString(), status: refund.status } };
+  });
+
   // ── WhatsApp QR Proxy ─────────────────────────────────────────────────
   fastify.get<{ Params: { id: string } }>('/vendors/:id/whatsapp/qr', async (request) => {
     const vendorId = BigInt(request.params.id);
@@ -695,7 +744,7 @@ const start = async () => {
     catch { return reply.status(400).send({ error: 'Invalid vendor ID' }); }
     const vendor = await prisma.vendor.findUnique({
       where: { id },
-      select: { name: true, email: true, phoneNumber: true, agentName: true, agentTone: true, agentGreeting: true }
+      select: { name: true, email: true, phoneNumber: true, agentName: true, agentTone: true, agentGreeting: true, monnifySubaccountCode: true }
     });
     if (!vendor) return reply.status(404).send({ error: 'Vendor not found' });
     return {
@@ -705,7 +754,8 @@ const start = async () => {
         phoneNumber: vendor.phoneNumber,
         agentName: vendor.agentName || vendor.name,
         agentTone: vendor.agentTone || 'Friendly',
-        agentGreeting: vendor.agentGreeting || `Hello! I am ${vendor.agentName || vendor.name}'s AI sales agent. How can I help you today?`
+        agentGreeting: vendor.agentGreeting || `Hello! I am ${vendor.agentName || vendor.name}'s AI sales agent. How can I help you today?`,
+        monnifySubaccountCode: vendor.monnifySubaccountCode || null
       }
     };
   });
@@ -770,6 +820,36 @@ const start = async () => {
     return BusinessInsightsService.ask(id, period, question);
   });
 
+  // ── Setup Monnify Subaccount settings ─────────────────────────────
+  fastify.post<{ Params: { id: string }; Body: { bankCode: string; accountNumber: string; email: string; subAccountName: string } }>('/vendors/:id/settings/subaccount', async (request, reply) => {
+    let id: bigint;
+    try { id = BigInt(request.params.id); }
+    catch { return reply.status(400).send({ error: 'Invalid vendor ID' }); }
+
+    const { bankCode, accountNumber, email, subAccountName } = request.body;
+    if (!bankCode || !accountNumber || !email || !subAccountName) {
+      return reply.status(400).send({ error: 'Missing required subaccount details' });
+    }
+
+    const subaccountCode = await MonnifyService.createSubaccount({
+      bankCode,
+      accountNumber,
+      email,
+      subAccountName
+    });
+
+    if (!subaccountCode) {
+      return reply.status(500).send({ error: 'Failed to create Monnify subaccount' });
+    }
+
+    await prisma.vendor.update({
+      where: { id },
+      data: { monnifySubaccountCode: subaccountCode }
+    });
+
+    return { success: true, subaccountCode };
+  });
+
   // ── Monnify Webhook ────────────────────────────────────────────────
   // Parse JSON globally but stash raw string on request for HMAC verification
   fastify.addContentTypeParser('application/json', { parseAs: 'string' }, (req, body: string, done) => {
@@ -813,7 +893,7 @@ const start = async () => {
       }
 
       // Order payment
-      const order = await prisma.order.findFirst({
+      let order = await prisma.order.findFirst({
         where: {
           OR: [
             { paymentLink: paymentReference },
@@ -822,6 +902,19 @@ const start = async () => {
         },
         include: { items: { include: { product: true } }, customer: true }
       });
+
+      if (!order) {
+        const customer = await prisma.customer.findFirst({
+          where: { reservedAccountReference: paymentReference }
+        });
+        if (customer) {
+          order = await prisma.order.findFirst({
+            where: { customerId: customer.id, status: 'PENDING' },
+            orderBy: { createdAt: 'desc' },
+            include: { items: { include: { product: true } }, customer: true }
+          });
+        }
+      }
 
       if (!order || order.status !== 'PENDING') return reply.status(200).send({ received: true });
       const orderId = order.id;

@@ -2,9 +2,11 @@
 
 ## Active Tracks
 
-- [monnify-advanced-features](tracks/monnify_advanced_features_20260721/) — Advanced Monnify Features: Plan implementation of Customer Reserved Account bank transfers, automated refunds, and payment splitting.
+*(none)*
 
 ## Completed Tracks
+
+- [monnify-advanced-features](tracks/monnify_advanced_features_20260721/) — Advanced Monnify Features: Implemented Customer Reserved Account bank transfers, automated refunds, and payment splitting.
 
 - [pitch-deck-pdf-generation](tracks/pitch_deck_pdf_generation_20260721/) — Investor Pitch Deck & Puppeteer PDF Generation: Created sleek 16:9 HTML presentation deck and rendered PDF via Puppeteer with Chromium.
 

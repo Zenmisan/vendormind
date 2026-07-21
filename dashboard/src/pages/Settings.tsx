@@ -21,9 +21,10 @@ interface SettingsData {
   agentName: string;
   agentTone: string;
   agentGreeting: string;
+  monnifySubaccountCode?: string | null;
 }
 
-type Tab = 'profile' | 'persona' | 'danger';
+type Tab = 'profile' | 'persona' | 'payout' | 'danger';
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<SettingsData | null>(null);
@@ -32,6 +33,11 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<Tab>('profile');
   const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [bankCode, setBankCode] = useState('035'); // Default to Wema
+  const [accountNumber, setAccountNumber] = useState('');
+  const [subAccountName, setSubAccountName] = useState('');
+  const [subaccountLoading, setSubaccountLoading] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -74,11 +80,44 @@ export default function SettingsPage() {
     }
   };
 
+  const handleSaveSubaccount = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!settings) return;
+    setSubaccountLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API}/vendors/${VENDOR_ID}/settings/subaccount`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bankCode,
+          accountNumber,
+          email: settings.email,
+          subAccountName: subAccountName || settings.name
+        }),
+      });
+      if (res.ok) {
+        const payload = await res.json() as { subaccountCode: string };
+        setSettings({ ...settings, monnifySubaccountCode: payload.subaccountCode });
+        setShowSuccess(true);
+        setTimeout(() => setShowSuccess(false), 3000);
+      } else {
+        const data = await res.json() as any;
+        throw new Error(data.error || 'Failed to link payout account');
+      }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setSubaccountLoading(false);
+    }
+  };
+
   useEffect(() => { load(); }, []);
 
   const tabs = [
     { id: 'profile', label: 'Business Profile', Icon: User },
     { id: 'persona', label: 'Agent Persona', Icon: Bot },
+    { id: 'payout', label: 'Payout Details', Icon: Settings },
     { id: 'danger', label: 'Danger Zone', Icon: ShieldAlert },
   ] as const;
 
@@ -239,6 +278,81 @@ export default function SettingsPage() {
                   </>
                 )}
 
+                {activeTab === 'payout' && (
+                  <div style={{ display: 'grid', gap: '1.5rem' }}>
+                    <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', fontWeight: 800, margin: 0 }}>Payout Details</h2>
+                    <p style={{ fontSize: '0.82rem', color: 'var(--text-3)', margin: '-0.75rem 0 0.5rem' }}>Configure where you receive sales payouts through Monnify split payments.</p>
+
+                    {settings.monnifySubaccountCode ? (
+                      <div style={{ border: '1px solid var(--brand-glow)', background: 'var(--surface-raised)', padding: '1.25rem', borderRadius: 12, display: 'grid', gap: '0.5rem' }}>
+                        <h3 style={{ fontSize: '0.9rem', fontWeight: 700, margin: 0, color: 'var(--brand)' }}>Payout Split Subaccount Connected</h3>
+                        <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-2)', fontFamily: 'monospace' }}>
+                          Subaccount Reference: {settings.monnifySubaccountCode}
+                        </p>
+                        <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-3)' }}>
+                          95% of customer payments will be split directly to your bank account, and 5% to the VendorMind platform.
+                        </p>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'grid', gap: '1.25rem' }}>
+                        <label style={{ display: 'grid', gap: '0.375rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-2)' }}>
+                          Bank Provider
+                          <select
+                            className="input"
+                            value={bankCode}
+                            onChange={e => setBankCode(e.target.value)}
+                            style={{ background: 'var(--surface)', color: 'var(--text)' }}
+                          >
+                            <option value="035">Wema Bank</option>
+                            <option value="058">GTBank</option>
+                            <option value="011">First Bank</option>
+                            <option value="057">Zenith Bank</option>
+                            <option value="232">Sterling Bank</option>
+                          </select>
+                        </label>
+
+                        <label style={{ display: 'grid', gap: '0.375rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-2)' }}>
+                          Account Number
+                          <input
+                            className="input"
+                            value={accountNumber}
+                            onChange={e => setAccountNumber(e.target.value)}
+                            required
+                            maxLength={10}
+                            placeholder="0123456789"
+                          />
+                        </label>
+
+                        <label style={{ display: 'grid', gap: '0.375rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-2)' }}>
+                          Account Name (Beneficiary)
+                          <input
+                            className="input"
+                            value={subAccountName}
+                            onChange={e => setSubAccountName(e.target.value)}
+                            required
+                            placeholder="Mama Cee's Kitchen Ltd"
+                          />
+                        </label>
+
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          onClick={handleSaveSubaccount}
+                          disabled={subaccountLoading}
+                          style={{ justifySelf: 'start', marginTop: '0.5rem', minWidth: 150 }}
+                        >
+                          {subaccountLoading ? (
+                            <Loader2 size={14} style={{ animation: 'spin-slow 1s linear infinite' }} />
+                          ) : (
+                            <CheckCircle size={14} />
+                          )}
+                          {subaccountLoading ? 'Creating Subaccount...' : 'Link Payout Account'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {activeTab === 'danger' && (
                   <>
                     <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', fontWeight: 800, margin: 0, color: '#ef4444' }}>Danger Zone</h2>
@@ -271,7 +385,7 @@ export default function SettingsPage() {
                 )}
 
                 {/* Submit button (only for form tabs) */}
-                {activeTab !== 'danger' && (
+                {activeTab !== 'danger' && activeTab !== 'payout' && (
                   <button type="submit" className="btn-primary" disabled={saveLoading} style={{ justifySelf: 'end', marginTop: '0.5rem', minWidth: 120 }}>
                     {saveLoading ? (
                       <Loader2 size={14} style={{ animation: 'spin-slow 1s linear infinite' }} />

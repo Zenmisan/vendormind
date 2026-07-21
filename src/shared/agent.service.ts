@@ -326,7 +326,12 @@ When the customer is ready to pay, call generatePaymentLink. If they need human 
         .map(i => `• ${i.quantity}× ${i.product.name} — ₦${Number(i.product.price) * i.quantity}`)
         .join('\n');
 
-      return `Order created!\n\n${itemsSummary}\n\nTotal: ₦${total.toFixed(2)}\n\nPay here (expires in 30 min):\n${paymentUrl}`;
+      let paymentPrompt = `Pay here (expires in 30 min):\n${paymentUrl}`;
+      if (customer.reservedAccountNumber && customer.reservedBankName) {
+        paymentPrompt += `\n\nOr transfer directly to your dedicated shop account:\n🏦 Bank: ${customer.reservedBankName}\n🔢 Account: ${customer.reservedAccountNumber}\n👤 Name: VendorMind: ${customer.name || 'Customer'}`;
+      }
+
+      return `Order created!\n\n${itemsSummary}\n\nTotal: ₦${total.toFixed(2)}\n\n${paymentPrompt}`;
     }
 
     if (name === "handoff") {
