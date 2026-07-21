@@ -49,8 +49,8 @@ export default function Conversations() {
     return phone.replace(/(\+\d{3}\s?\d{2})\d{3}(\d{4})/, '$1***$2');
   };
 
-  const loadList = async () => {
-    setLoadingList(true);
+  const loadList = async (silent = false) => {
+    if (!silent && conversations.length === 0) setLoadingList(true);
     try {
       const res = await fetch(`${API}/vendors/${VENDOR_ID}/conversations`);
       if (res.ok) {
@@ -60,12 +60,12 @@ export default function Conversations() {
     } catch (err) {
       console.error('Failed to load conversations:', err);
     } finally {
-      setLoadingList(false);
+      if (!silent) setLoadingList(false);
     }
   };
 
-  const loadDetail = async (customerId: string) => {
-    setLoadingDetail(true);
+  const loadDetail = async (customerId: string, silent = false) => {
+    if (!silent) setLoadingDetail(true);
     try {
       const res = await fetch(`${API}/vendors/${VENDOR_ID}/conversations/${customerId}`);
       if (res.ok) {
@@ -75,7 +75,7 @@ export default function Conversations() {
     } catch (err) {
       console.error('Failed to load conversation details:', err);
     } finally {
-      setLoadingDetail(false);
+      if (!silent) setLoadingDetail(false);
     }
   };
 
@@ -108,15 +108,15 @@ export default function Conversations() {
     if (!typedMessage.trim() || !detail) return;
     setSendLoading(true);
     try {
-      const res = await fetch(`${API}/vendors/${VENDOR_ID}/conversations/${detail.customerId}/messages`, {
+      const res = await fetch(`${API}/vendors/${VENDOR_ID}/conversations/${detail.customerId}/message`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: typedMessage.trim() }),
+        body: JSON.stringify({ text: typedMessage.trim() }),
       });
       if (res.ok) {
-        const newMsg = {
-          id: `local-${Date.now()}`,
-          role: 'assistant' as const,
+        const newMsg: Message = {
+          id: 'temp-' + Date.now(),
+          role: 'assistant',
           content: typedMessage.trim(),
           timestamp: new Date().toISOString()
         };

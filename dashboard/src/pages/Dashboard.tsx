@@ -45,8 +45,8 @@ export default function Dashboard() {
 
   const VENDOR_ID = localStorage.getItem('vendorId') ?? '1';
 
-  const load = async () => {
-    setLoading(true);
+  const load = async (isInitial = false) => {
+    if (isInitial && !ops) setLoading(true);
     try {
       const [opsRes, ordersRes, waRes, walletRes] = await Promise.all([
         fetch(`${API}/ops/dashboard`),
@@ -55,7 +55,7 @@ export default function Dashboard() {
         fetch(`${API}/vendors/${VENDOR_ID}/wallet`)
       ]);
 
-      if (opsRes.ok) setOps(await opsRes.ok ? await opsRes.json() : null);
+      if (opsRes.ok) setOps(await opsRes.json());
       if (ordersRes.ok) {
         const data = await ordersRes.json() as { orders: Order[] };
         setOrders(data.orders || []);
@@ -70,14 +70,15 @@ export default function Dashboard() {
       }
     } catch (err) {
       console.error('Failed to load dashboard data:', err);
+    } finally {
+      if (isInitial) setLoading(false);
+      setLastRefresh(new Date());
     }
-    setLoading(false);
-    setLastRefresh(new Date());
   };
 
   useEffect(() => {
-    load();
-    // Poll WA status every 30s so disconnections reflect without manual refresh
+    load(true);
+    // Poll WA status quietly every 15s so disconnections/connections reflect in-place without page refresh
     const waInterval = setInterval(async () => {
       try {
         const res = await fetch(`${API}/vendors/${VENDOR_ID}/whatsapp/qr`);
@@ -87,7 +88,7 @@ export default function Dashboard() {
           setLastRefresh(new Date());
         }
       } catch {}
-    }, 30_000);
+    }, 15_000);
     return () => clearInterval(waInterval);
   }, []);
 

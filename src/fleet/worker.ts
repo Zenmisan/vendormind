@@ -1,14 +1,15 @@
 import makeWASocket, {
   DisconnectReason,
   fetchLatestBaileysVersion,
-  downloadMediaMessage
+  downloadMediaMessage,
+  type WAMessage
 } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
 import { usePrismaAuthState } from './auth';
 import { pino } from 'pino';
 import Groq from 'groq-sdk';
 import { Worker } from 'bullmq';
-import { inboundQueue, OUTBOUND_QUEUE, OutboundMessageJob, InboundMessageJob } from '../shared/queue';
+import { inboundQueue, OUTBOUND_QUEUE, type OutboundMessageJob, type InboundMessageJob } from '../shared/queue';
 import { redisConnection } from '../shared/redis';
 import { prisma } from '../shared/prisma/client';
 
@@ -18,7 +19,18 @@ const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 // socketMap tracks active sockets per vendor so we never double-start
 const socketMap = new Map<string, ReturnType<typeof makeWASocket>>();
 
-async function transcribeAudio(msg: any): Promise<string | null> {
+function extractMessageText(message: WAMessage['message']): string | null {
+  if (!message) return null;
+  if (message.conversation) return message.conversation;
+  if (message.extendedTextMessage?.text) return message.extendedTextMessage.text;
+  if (message.ephemeralMessage?.message) return extractMessageText(message.ephemeralMessage.message);
+  if (message.viewOnceMessage?.message) return extractMessageText(message.viewOnceMessage.message);
+  if (message.viewOnceMessageV2?.message) return extractMessageText(message.viewOnceMessageV2.message);
+  if (message.documentWithCaptionMessage?.message) return extractMessageText(message.documentWithCaptionMessage.message);
+  return null;
+}
+
+async function transcribeAudio(msg: WAMessage): Promise<string | null> {
   try {
     const buffer = await downloadMediaMessage(msg, 'buffer', {}) as Buffer;
     const file = new File([buffer], 'audio.ogg', { type: 'audio/ogg; codecs=opus' });
@@ -134,17 +146,6 @@ async function startSock(vendorId: string) {
     }
   });
 
-  function extractMessageText(message: any): string | null {
-    if (!message) return null;
-    if (message.conversation) return message.conversation;
-    if (message.extendedTextMessage?.text) return message.extendedTextMessage.text;
-    if (message.ephemeralMessage?.message) return extractMessageText(message.ephemeralMessage.message);
-    if (message.viewOnceMessage?.message) return extractMessageText(message.viewOnceMessage.message);
-    if (message.viewOnceMessageV2?.message) return extractMessageText(message.viewOnceMessageV2.message);
-    if (message.documentWithCaptionMessage?.message) return extractMessageText(message.documentWithCaptionMessage.message);
-    return null;
-  }
-
   sock.ev.on('messages.upsert', async (m) => {
     if (m.type !== 'notify') return;
 
@@ -225,7 +226,7 @@ new Worker<OutboundMessageJob>(OUTBOUND_QUEUE, async (job) => {
     console.error(`❌ [Vendor ${vendorId}] sendMessage failed:`, err.message);
     throw err; // let BullMQ retry
   }
-}, { connection: redisConnection, concurrency: 5 });
+}, { connection: redisConnection as any, concurrency: 5 });
 
 async function startAll() {
   try {
