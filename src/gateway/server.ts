@@ -74,8 +74,9 @@ const start = async () => {
 
     const buffer = await data.toBuffer();
     const workbook = XLSX.read(buffer, { type: 'buffer' });
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const items: any[] = XLSX.utils.sheet_to_json(sheet);
+    const firstSheetName = workbook.SheetNames[0] || '';
+    const sheet = workbook.Sheets[firstSheetName];
+    const items: any[] = sheet ? XLSX.utils.sheet_to_json(sheet) : [];
     const vendorId = BigInt(request.params.id);
 
     if (items.length === 0) return reply.status(400).send({ error: 'Spreadsheet is empty' });
@@ -130,7 +131,7 @@ const start = async () => {
 
     for (const p of inserted) {
       const text = [p.name, p.description].filter(Boolean).join(' — ');
-      await embedQueue.add<EmbedProductJob>(`embed:${p.id}`, {
+      await embedQueue.add(`embed:${p.id}`, {
         productId: p.id.toString(),
         text
       }, { jobId: `embed:${p.id}` });
@@ -553,15 +554,6 @@ const start = async () => {
       return reply.status(404).send({ error: 'Customer not found' });
     }
 
-    await prisma.message.create({
-      data: {
-        vendorId,
-        customerId,
-        sender: 'VENDOR',
-        content: content.trim()
-      }
-    });
-
     await outboundQueue.add(`reply:manual:${Date.now()}`, {
       vendorId: vendorId.toString(),
       remoteJid: `${customer.phoneNumber}@s.whatsapp.net`,
@@ -594,7 +586,7 @@ const start = async () => {
     });
 
     const text = [product.name, product.description].filter(Boolean).join(' — ');
-    await embedQueue.add<EmbedProductJob>(`embed:${product.id}`, {
+    await embedQueue.add(`embed:${product.id}`, {
       productId: product.id.toString(),
       text
     }, { jobId: `embed:${product.id}` });
@@ -631,7 +623,7 @@ const start = async () => {
 
     if (name !== undefined || description !== undefined) {
       const text = [product.name, product.description].filter(Boolean).join(' — ');
-      await embedQueue.add<EmbedProductJob>(`embed:${product.id}`, {
+      await embedQueue.add(`embed:${product.id}`, {
         productId: product.id.toString(),
         text
       }, { jobId: `embed:${product.id}`, removeOnComplete: true });

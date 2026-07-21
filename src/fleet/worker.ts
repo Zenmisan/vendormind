@@ -165,10 +165,10 @@ async function startSock(vendorId: string) {
 
       const text = extractMessageText(msg.message);
       if (text) {
-        jobData = { vendorId, customerPhone, customerName, messageId, type: 'text', content: text, timestamp: ts };
+        jobData = { vendorId, customerPhone, customerName: customerName ?? '', messageId, type: 'text', content: text, timestamp: ts };
       } else if (msg.message.locationMessage) {
         jobData = {
-          vendorId, customerPhone, customerName, messageId,
+          vendorId, customerPhone, customerName: customerName ?? '', messageId,
           type: 'location',
           location: {
             lat: msg.message.locationMessage.degreesLatitude ?? 0,
@@ -180,10 +180,10 @@ async function startSock(vendorId: string) {
         console.log(`🎙️ [Vendor ${vendorId}] Voice note from ${customerPhone} — transcribing...`);
         const transcription = await transcribeAudio(msg);
         if (transcription) {
-          jobData = { vendorId, customerPhone, customerName, messageId, type: 'text', content: transcription, timestamp: ts };
+          jobData = { vendorId, customerPhone, customerName: customerName ?? '', messageId, type: 'text', content: transcription, timestamp: ts };
           console.log(`🎙️ Transcribed: "${transcription}"`);
         } else {
-          jobData = { vendorId, customerPhone, customerName, messageId, type: 'text', content: "[Voice note received but could not be transcribed. Please type your message.]", timestamp: ts };
+          jobData = { vendorId, customerPhone, customerName: customerName ?? '', messageId, type: 'text', content: "[Voice note received but could not be transcribed. Please type your message.]", timestamp: ts };
         }
       }
 
@@ -212,9 +212,10 @@ new Worker<OutboundMessageJob>(OUTBOUND_QUEUE, async (job) => {
     throw new Error(`Socket not authenticated for vendor ${vendorId}`);
   }
 
-  let cleanJid = remoteJid;
-  if (remoteJid.endsWith('@s.whatsapp.net')) {
-    const num = remoteJid.split('@')[0].replace(/\D/g, '');
+  let cleanJid = remoteJid || '';
+  if (cleanJid.endsWith('@s.whatsapp.net')) {
+    const parts = cleanJid.split('@');
+    const num = (parts[0] || '').replace(/\D/g, '');
     cleanJid = `${num}@s.whatsapp.net`;
   }
 
