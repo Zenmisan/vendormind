@@ -62,7 +62,7 @@ interface InsightResponse extends InsightReport {
 
 interface OrderSnapshot {
   id: bigint;
-  total: number;
+  total: any;
   status: string;
   createdAt: Date;
   customerId: bigint;

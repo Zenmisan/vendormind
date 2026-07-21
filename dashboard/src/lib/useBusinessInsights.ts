@@ -1,11 +1,6 @@
 import { useEffect, useState } from 'react';
-import {
-  askBusinessInsights,
-  BusinessInsightsResponse,
-  fetchBusinessInsights,
-  InsightConversationMessage,
-  InsightPeriod,
-} from './insightsApi';
+import { askBusinessInsights, fetchBusinessInsights } from './insightsApi';
+import type { BusinessInsightsResponse, InsightConversationMessage, InsightPeriod } from './insightsApi';
 
 export function useBusinessInsights(vendorId: string) {
   const [period, setPeriod] = useState<InsightPeriod>('7d');
