@@ -1,5 +1,5 @@
 import { Worker } from 'bullmq';
-import { RELEASE_QUEUE, ReleaseReservationJob, outboundQueue } from '../shared/queue';
+import { RELEASE_QUEUE, type ReleaseReservationJob, outboundQueue } from '../shared/queue';
 import { redisConnection } from '../shared/redis';
 import { prisma } from '../shared/prisma/client';
 
@@ -50,7 +50,7 @@ const worker = new Worker<ReleaseReservationJob>(
 
     console.log(`🔓 Released reservation for order ${orderId}`);
   },
-  { connection: redisConnection }
+  { connection: redisConnection as any }
 );
 
 console.log('👷 Release Reservation Worker started');
