@@ -14,17 +14,22 @@ export class AgentService {
     });
     const hasCartItems = (customerRecord?.cart?.items?.length ?? 0) > 0;
 
-    // Smart Filter: Always classify incoming message to differentiate business/customer queries vs casual/personal chit-chat
-    const isBusiness = await this.isBusinessConversation(text);
-    if (!isBusiness && !hasCartItems) {
-      console.log(`🤖 Standing down on personal/casual message for customer ${customerId}: "${text}"`);
-      return '__STAND_DOWN__';
+    // Smart Filter: Classify initial message to filter out casual/personal chit-chat, but continue if conversation is ongoing
+    const isOngoing = context.recentMessages.length > 1;
+    if (!isOngoing && !hasCartItems) {
+      const isBusiness = await this.isBusinessConversation(text);
+      if (!isBusiness) {
+        console.log(`🤖 Standing down on initial personal/casual message for customer ${customerId}: "${text}"`);
+        return '__STAND_DOWN__';
+      }
     }
 
-    const messages: Anthropic.MessageParam[] = [
-      ...context.recentMessages,
-      { role: "user", content: text }
-    ];
+    const lastRecent = context.recentMessages[context.recentMessages.length - 1];
+    const isLastMsgUserText = lastRecent && lastRecent.role === 'user' && (typeof lastRecent.content === 'string' ? lastRecent.content : JSON.stringify(lastRecent.content)) === text;
+
+    const messages: Anthropic.MessageParam[] = isLastMsgUserText
+      ? [...context.recentMessages]
+      : [...context.recentMessages, { role: "user", content: text }];
 
     const vendor = await prisma.vendor.findUnique({
       where: { id: vendorId },

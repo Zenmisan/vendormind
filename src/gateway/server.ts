@@ -426,6 +426,27 @@ const start = async () => {
     if (data.connected) return { status: 'connected' };
     if (data.pairingCode) return { status: 'ready', code: data.pairingCode };
     return { status: 'waiting' };
+  // ── WhatsApp Status Check (Persistent across devices) ──────────────
+  fastify.get<{ Params: { id: string } }>('/vendors/:id/whatsapp/status', async (request) => {
+    const vendorId = BigInt(request.params.id);
+
+    const credsSession = await prisma.whatsAppSession.findFirst({
+      where: { vendorId, sessionId: `${request.params.id}:creds` }
+    });
+    if (credsSession) {
+      const credsData = credsSession.data as any;
+      if (credsData?.me?.id || credsData?.registered) {
+        return { connected: true, status: 'connected' };
+      }
+    }
+
+    const session = await prisma.whatsAppSession.findFirst({
+      where: { vendorId, sessionId: `${request.params.id}:qr` },
+      orderBy: { updatedAt: 'desc' }
+    });
+    if (!session) return { connected: false, status: 'disconnected' };
+    const data = session.data as any;
+    return { connected: !!data.connected, status: data.connected ? 'connected' : 'disconnected' };
   });
 
   // ── Wallet Details ────────────────────────────────────────────────

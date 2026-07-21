@@ -43,16 +43,16 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState(new Date());
 
-  const VENDOR_ID = localStorage.getItem('vendorId') ?? '1';
+  const getVendorId = () => localStorage.getItem('vendorId') ?? '1';
 
   const load = async (isInitial = false) => {
     if (isInitial && !ops) setLoading(true);
     try {
       const [opsRes, ordersRes, waRes, walletRes] = await Promise.all([
         fetch(`${API}/ops/dashboard`),
-        fetch(`${API}/vendors/${VENDOR_ID}/orders?limit=5`),
-        fetch(`${API}/vendors/${VENDOR_ID}/whatsapp/qr`),
-        fetch(`${API}/vendors/${VENDOR_ID}/wallet`)
+        fetch(`${API}/vendors/${getVendorId()}/orders?limit=5`),
+        fetch(`${API}/vendors/${getVendorId()}/whatsapp/status`),
+        fetch(`${API}/vendors/${getVendorId()}/wallet`)
       ]);
 
       if (opsRes.ok) setOps(await opsRes.json());
@@ -61,8 +61,8 @@ export default function Dashboard() {
         setOrders(data.orders || []);
       }
       if (waRes.ok) {
-        const data = await waRes.json() as { status: string };
-        setWaConnected(data.status === 'connected');
+        const data = await waRes.json() as { connected: boolean; status: string };
+        setWaConnected(data.connected || data.status === 'connected');
       }
       if (walletRes.ok) {
         const data = await walletRes.json() as { balance: number };
@@ -81,10 +81,10 @@ export default function Dashboard() {
     // Poll WA status quietly every 15s so disconnections/connections reflect in-place without page refresh
     const waInterval = setInterval(async () => {
       try {
-        const res = await fetch(`${API}/vendors/${VENDOR_ID}/whatsapp/qr`);
+        const res = await fetch(`${API}/vendors/${getVendorId()}/whatsapp/status`);
         if (res.ok) {
-          const data = await res.json() as { status: string };
-          setWaConnected(data.status === 'connected');
+          const data = await res.json() as { connected: boolean; status: string };
+          setWaConnected(data.connected || data.status === 'connected');
           setLastRefresh(new Date());
         }
       } catch {}
@@ -256,7 +256,7 @@ export default function Dashboard() {
 
       {showReconnectModal && (
         <WhatsAppConnectModal
-          vendorId={VENDOR_ID}
+          vendorId={getVendorId()}
           onConnected={() => {
             setWaConnected(true);
             setShowReconnectModal(false);
