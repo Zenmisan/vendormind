@@ -211,12 +211,6 @@ new Worker<OutboundMessageJob>(OUTBOUND_QUEUE, async (job) => {
     throw new Error(`Socket not authenticated for vendor ${vendorId}`);
   }
 
-  const isConnected = (sock as any).ws?.readyState === 1;
-  if (!isConnected) {
-    console.error(`📤 [Vendor ${vendorId}] WebSocket connection is not OPEN (readyState: ${(sock as any).ws?.readyState}) — will retry`);
-    throw new Error(`Socket connection not open for vendor ${vendorId}`);
-  }
-
   let cleanJid = remoteJid;
   if (remoteJid.endsWith('@s.whatsapp.net')) {
     const num = remoteJid.split('@')[0].replace(/\D/g, '');
