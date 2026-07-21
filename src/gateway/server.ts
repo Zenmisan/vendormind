@@ -353,8 +353,13 @@ const start = async () => {
     // Clear all existing sessions for this vendor so Baileys starts 100% unregistered
     await prisma.whatsAppSession.deleteMany({ where: { vendorId } });
 
+    let formattedPhone = phone.replace(/\D/g, '');
+    if (formattedPhone.startsWith('0') && formattedPhone.length === 11) {
+      formattedPhone = '234' + formattedPhone.slice(1);
+    }
+
     // Signal fleet worker to use pairing code on next QR event
-    await redisConnection.set(`pairing_phone:${request.params.id}`, phone.replace(/\D/g, ''), 'EX', 300);
+    await redisConnection.set(`pairing_phone:${request.params.id}`, formattedPhone, 'EX', 300);
 
     // Notify fleet worker to restart socket for fresh pairing event
     await redisConnection.publish('fleet_control', JSON.stringify({
