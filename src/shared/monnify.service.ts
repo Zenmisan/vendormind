@@ -58,7 +58,7 @@ export class MonnifyService {
       const expiresInSec = Number(body.responseBody.expiresIn) || 3600;
       this.tokenExpiresAt = Date.now() + expiresInSec * 1000;
 
-      return this.cachedToken;
+      return this.cachedToken || '';
     } catch (err: any) {
       console.error('❌ Failed to get Monnify access token:', err.message);
       throw err;

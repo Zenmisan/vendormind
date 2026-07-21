@@ -1,5 +1,5 @@
 import { Worker } from 'bullmq';
-import { EMBED_QUEUE, EmbedProductJob } from '../shared/queue';
+import { EMBED_QUEUE, type EmbedProductJob } from '../shared/queue';
 import { redisConnection } from '../shared/redis';
 import { prisma } from '../shared/prisma/client';
 
@@ -39,7 +39,7 @@ const worker = new Worker<EmbedProductJob>(
 
     console.log(`✅ Product ${productId} embedded`);
   },
-  { connection: redisConnection }
+  { connection: redisConnection as any }
 );
 
 console.log('👷 Embed Product Worker started');

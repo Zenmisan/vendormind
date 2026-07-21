@@ -45,12 +45,12 @@ export default function Products() {
   const [stock, setStock] = useState('');
   const [description, setDescription] = useState('');
 
-  const VENDOR_ID = localStorage.getItem('vendorId') ?? '1';
+  const getVendorId = () => localStorage.getItem('vendorId') ?? '1';
 
   const load = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API}/vendors/${VENDOR_ID}/products`);
+      const res = await fetch(`${API}/vendors/${getVendorId()}/products`);
       if (!res.ok) { console.error('Products fetch failed:', res.status); setProducts([]); return; }
       const data = await res.json() as { products?: Product[] };
       setProducts(data.products ?? []);
@@ -70,7 +70,7 @@ export default function Products() {
     const fd = new FormData();
     fd.append('file', e.target.files[0]);
     try {
-      const res = await fetch(`${API}/vendors/${VENDOR_ID}/catalog`, { method: 'POST', body: fd });
+      const res = await fetch(`${API}/vendors/${getVendorId()}/catalog`, { method: 'POST', body: fd });
       const data = await res.json() as { count?: number };
       setLastUpload(`${data.count ?? 'New'} products queued for indexing`);
       load();
@@ -86,7 +86,7 @@ export default function Products() {
     e.preventDefault();
     setFormLoading(true);
     try {
-      const res = await fetch(`${API}/vendors/${VENDOR_ID}/products`, {
+      const res = await fetch(`${API}/vendors/${getVendorId()}/products`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, price: Number(price), stock: Number(stock), description }),
@@ -95,9 +95,13 @@ export default function Products() {
         setIsAddOpen(false);
         resetForm();
         load();
+      } else {
+        const data = await res.json() as any;
+        alert(data.error || 'Failed to add product');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Add failed:', err);
+      alert('Network error adding product: ' + err.message);
     } finally {
       setFormLoading(false);
     }
@@ -108,8 +112,14 @@ export default function Products() {
     if (!editingProduct) return;
     setFormLoading(true);
     try {
-      const res = await fetch(`${API}/vendors/${VENDOR_ID}/products/${editingProduct.id}`, {
-        method: 'PUT',
+      const isSample = editingProduct.id.startsWith('sample-');
+      const url = isSample
+        ? `${API}/vendors/${getVendorId()}/products`
+        : `${API}/vendors/${getVendorId()}/products/${editingProduct.id}`;
+      const method = isSample ? 'POST' : 'PUT';
+
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, price: Number(price), stock: Number(stock), description }),
       });
@@ -117,10 +127,14 @@ export default function Products() {
         setIsEditOpen(false);
         setEditingProduct(null);
         resetForm();
-        load();
+        await load();
+      } else {
+        const data = await res.json() as any;
+        alert(data.error || 'Failed to update product');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Edit failed:', err);
+      alert('Network error updating product: ' + err.message);
     } finally {
       setFormLoading(false);
     }
@@ -129,14 +143,23 @@ export default function Products() {
   const handleDelete = async (productId: string) => {
     if (!window.confirm('Are you sure you want to delete this product?')) return;
     try {
-      const res = await fetch(`${API}/vendors/${VENDOR_ID}/products/${productId}`, {
+      const isSample = productId.startsWith('sample-');
+      if (isSample) {
+        setProducts(prev => prev.filter(p => p.id !== productId));
+        return;
+      }
+      const res = await fetch(`${API}/vendors/${getVendorId()}/products/${productId}`, {
         method: 'DELETE',
       });
       if (res.ok) {
         load();
+      } else {
+        const data = await res.json() as any;
+        alert(data.error || 'Failed to delete product');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Delete failed:', err);
+      alert('Network error deleting product: ' + err.message);
     }
   };
 
@@ -216,7 +239,7 @@ export default function Products() {
         </div>
 
         {/* Stats */}
-        <div className="stat-grid animate-fade-up-1" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1.25rem' }}>
+        <div className="stat-grid animate-fade-up-1" style={{ marginBottom: '1.25rem' }}>
           {[
             { label: 'Catalog items', value: displayProducts.length, Icon: Package, color: '#16a34a', bg: 'rgba(22,163,74,0.1)' },
             { label: 'Total stock', value: totalStock, Icon: FileSpreadsheet, color: '#3b82f6', bg: 'rgba(59,130,246,0.1)' },

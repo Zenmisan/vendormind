@@ -1,7 +1,7 @@
 import { 
-  AuthenticationState, 
-  AuthenticationCreds, 
-  SignalDataTypeMap, 
+  type AuthenticationState, 
+  type AuthenticationCreds, 
+  type SignalDataTypeMap, 
   initAuthCreds, 
   BufferJSON, 
   proto 
@@ -57,9 +57,12 @@ export const usePrismaAuthState = async (sessionId: string): Promise<{ state: Au
         },
         set: async (data) => {
           const tasks: Promise<void>[] = [];
-          for (const category in data) {
-            for (const id in data[category]) {
-              const value = data[category][id];
+          const categoryData = data as Record<string, Record<string, any>>;
+          for (const category in categoryData) {
+            const sub = categoryData[category];
+            if (!sub) continue;
+            for (const id in sub) {
+              const value = sub[id];
               const key = `${category}-${id}`;
               tasks.push(value ? writeData(value, key) : removeData(key));
             }

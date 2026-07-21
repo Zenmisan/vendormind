@@ -104,7 +104,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Settings layout */}
-        <div className="dashboard-grid animate-fade-up-1" style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: '1.75rem', alignItems: 'start' }}>
+        <div className="dashboard-grid animate-fade-up-1" style={{ alignItems: 'start' }}>
           {/* Navigation vertical tabs */}
           <aside className="card" style={{ padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '2px' }}>
             {tabs.map((tab) => {

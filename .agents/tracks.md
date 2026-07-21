@@ -2,9 +2,21 @@
 
 ## Active Tracks
 
-*(none)*
+- [monnify-advanced-features](tracks/monnify_advanced_features_20260721/) — Advanced Monnify Features: Plan implementation of Customer Reserved Account bank transfers, automated refunds, and payment splitting.
 
 ## Completed Tracks
+
+- [pitch-deck-pdf-generation](tracks/pitch_deck_pdf_generation_20260721/) — Investor Pitch Deck & Puppeteer PDF Generation: Created sleek 16:9 HTML presentation deck and rendered PDF via Puppeteer with Chromium.
+
+- [whatsapp-qr-pairing-sync-fix](tracks/whatsapp_qr_pairing_sync_fix_20260721/) — WhatsApp QR & Pairing Sync Fix: Redis control pub/sub to force Baileys socket restart for fresh QR and pairing code generation.
+
+- [full-app-responsiveness](tracks/full_app_responsiveness_20260721/) — Full App Mobile Responsiveness Overhaul: Centralized CSS grid classes, media queries, flex-wrap chips, and mobile card layouts across all pages.
+
+- [pricing-cards-alignment](tracks/pricing_cards_alignment_20260721/) — Pricing Cards CTA Alignment: Flexbox column layout and marginTop auto on buttons for symmetrical alignment.
+
+- [groq-model-name-fix](tracks/groq_model_name_fix_20260721/) — AI Provider Model Identifiers Fix: Replaced invalid model names with official production models (llama-3.3-70b-versatile, claude-3-5-sonnet-20241022, gemini-1.5-flash).
+
+- [db-connection-resilience](tracks/db_connection_resilience_20260721/) — DB Connection Resilience & Fleet Retry: Added SSL options and pool timeouts to pg.Pool, and retry loop to fleet startup.
 
 - [scroll-to-top-fix](tracks/scroll_to_top_fix_20260720/) — Scroll-to-Top Route Navigation Fix: Automatically reset window scroll position to top (0, 0) on React Router navigation.
 

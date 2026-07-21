@@ -21,7 +21,7 @@ Inbound Processor Worker
         ├── addToCart
         ├── checkDelivery
         ├── searchDocuments  (pgvector similarity → LIKE fallback)
-        ├── generatePaymentLink  (Nomba)
+        ├── generatePaymentLink  (Monnify)
         └── handoff
        │
        ▼
@@ -75,12 +75,11 @@ Customer: "checkout"
   → Order created (status: PENDING)
   → Stock incremented to reservedStock
   → SoftReservation created (expires: now + 30 min)
-  → Nomba checkout order initialized
-  → release-reservation job enqueued (delay: 30 min)
-  → Cart cleared
-  → Payment URL sent to customer
+  → Monnify checkout order initialized
+  → 30-min soft reservation created
+  → Outbound reply sent with checkout link
 
-Customer pays → Nomba webhook POST /webhooks/nomba
+Customer pays → Monnify webhook POST /webhooks/monnify
   → Webhook signature verified
   → Order status → PAID
   → Stock decremented (sold)

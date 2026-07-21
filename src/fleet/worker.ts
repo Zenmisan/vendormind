@@ -1,14 +1,15 @@
 import makeWASocket, {
   DisconnectReason,
   fetchLatestBaileysVersion,
-  downloadMediaMessage
+  downloadMediaMessage,
+  type WAMessage
 } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
 import { usePrismaAuthState } from './auth';
 import { pino } from 'pino';
 import Groq from 'groq-sdk';
 import { Worker } from 'bullmq';
-import { inboundQueue, OUTBOUND_QUEUE, OutboundMessageJob, InboundMessageJob } from '../shared/queue';
+import { inboundQueue, OUTBOUND_QUEUE, type OutboundMessageJob, type InboundMessageJob } from '../shared/queue';
 import { redisConnection } from '../shared/redis';
 import { prisma } from '../shared/prisma/client';
 
@@ -18,7 +19,18 @@ const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 // socketMap tracks active sockets per vendor so we never double-start
 const socketMap = new Map<string, ReturnType<typeof makeWASocket>>();
 
-async function transcribeAudio(msg: any): Promise<string | null> {
+function extractMessageText(message: WAMessage['message']): string | null {
+  if (!message) return null;
+  if (message.conversation) return message.conversation;
+  if (message.extendedTextMessage?.text) return message.extendedTextMessage.text;
+  if (message.ephemeralMessage?.message) return extractMessageText(message.ephemeralMessage.message);
+  if (message.viewOnceMessage?.message) return extractMessageText(message.viewOnceMessage.message);
+  if (message.viewOnceMessageV2?.message) return extractMessageText(message.viewOnceMessageV2.message);
+  if (message.documentWithCaptionMessage?.message) return extractMessageText(message.documentWithCaptionMessage.message);
+  return null;
+}
+
+async function transcribeAudio(msg: WAMessage): Promise<string | null> {
   try {
     const buffer = await downloadMediaMessage(msg, 'buffer', {}) as Buffer;
     const file = new File([buffer], 'audio.ogg', { type: 'audio/ogg; codecs=opus' });
@@ -35,7 +47,15 @@ async function transcribeAudio(msg: any): Promise<string | null> {
 }
 
 async function startSock(vendorId: string) {
-  if (socketMap.has(vendorId)) return;
+  if (socketMap.has(vendorId)) {
+    const activeSock = socketMap.get(vendorId);
+    if ((activeSock as any)?.ws?.readyState === 1 && activeSock?.user) {
+      return;
+    }
+    socketMap.delete(vendorId);
+    try { (activeSock as any)?.ws?.close(); } catch {}
+    try { activeSock?.end(undefined); } catch {}
+  }
   let reconnectCount = 0;
   const { state, saveCreds } = await usePrismaAuthState(vendorId);
   const { version, isLatest } = await fetchLatestBaileysVersion();
@@ -71,13 +91,14 @@ async function startSock(vendorId: string) {
     const { connection, lastDisconnect, qr } = update;
 
     if (qr) {
-      // Check if vendor requested pairing code instead of QR
       const pairingPhone = await redisConnection.get(`pairing_phone:${vendorId}`);
       if (pairingPhone && !state.creds.registered) {
         try {
-          const code = await sock.requestPairingCode(pairingPhone.replace(/\D/g, ''));
+          const cleanPhone = pairingPhone.replace(/\D/g, '');
+          console.log(`📱 [Vendor ${vendorId}] Requesting pairing code for ${cleanPhone}...`);
+          const code = await sock.requestPairingCode(cleanPhone);
           await redisConnection.del(`pairing_phone:${vendorId}`);
-          console.log(`📱 [Vendor ${vendorId}] Pairing code: ${code}`);
+          console.log(`📱 [Vendor ${vendorId}] Pairing code generated: ${code}`);
           await prisma.whatsAppSession.upsert({
             where: { sessionId: `${vendorId}:qr` },
             update: { data: { pairingCode: code }, updatedAt: new Date() },
@@ -108,10 +129,10 @@ async function startSock(vendorId: string) {
 
       if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
         console.log(`[Vendor ${vendorId}] Logged out — clearing session`);
-        await prisma.whatsAppSession.deleteMany({ where: { vendorId: vId } });
+        await prisma.whatsAppSession.deleteMany({ where: { vendorId: vId } }).catch(() => {});
       } else if (statusCode !== 440) {
         reconnectCount++;
-        const delay = Math.min(5000 * (2 ** Math.min(reconnectCount, 4)), 60000);
+        const delay = reconnectCount === 1 ? 1000 : Math.min(2000 * (2 ** Math.min(reconnectCount, 4)), 30000);
         console.log(`[Vendor ${vendorId}] Disconnected (${statusCode}) — reconnecting in ${delay/1000}s (attempt ${reconnectCount})`);
         setTimeout(() => startSock(vendorId), delay);
       }
@@ -121,20 +142,9 @@ async function startSock(vendorId: string) {
         where: { sessionId: `${vendorId}:qr` },
         update: { data: { connected: true }, updatedAt: new Date() },
         create: { vendorId: vId, sessionId: `${vendorId}:qr`, data: { connected: true } },
-      });
+      }).catch(() => {});
     }
   });
-
-  function extractMessageText(message: any): string | null {
-    if (!message) return null;
-    if (message.conversation) return message.conversation;
-    if (message.extendedTextMessage?.text) return message.extendedTextMessage.text;
-    if (message.ephemeralMessage?.message) return extractMessageText(message.ephemeralMessage.message);
-    if (message.viewOnceMessage?.message) return extractMessageText(message.viewOnceMessage.message);
-    if (message.viewOnceMessageV2?.message) return extractMessageText(message.viewOnceMessageV2.message);
-    if (message.documentWithCaptionMessage?.message) return extractMessageText(message.documentWithCaptionMessage.message);
-    return null;
-  }
 
   sock.ev.on('messages.upsert', async (m) => {
     if (m.type !== 'notify') return;
@@ -147,7 +157,7 @@ async function startSock(vendorId: string) {
       // Only handle personal DMs — skip groups, broadcasts, status, newsletters
       if (!remoteJid.endsWith('@s.whatsapp.net')) continue;
 
-      const customerPhone = remoteJid.split('@')[0];
+      const customerPhone = (remoteJid.split('@')[0] || '').replace(/\D/g, '');
       const customerName = msg.pushName?.trim() || undefined;
       const messageId = msg.key.id || '';
       const ts = Number(msg.messageTimestamp) || Date.now();
@@ -155,14 +165,14 @@ async function startSock(vendorId: string) {
 
       const text = extractMessageText(msg.message);
       if (text) {
-        jobData = { vendorId, customerPhone, customerName, messageId, type: 'text', content: text, timestamp: ts };
+        jobData = { vendorId, customerPhone, customerName: customerName ?? '', messageId, type: 'text', content: text, timestamp: ts };
       } else if (msg.message.locationMessage) {
         jobData = {
-          vendorId, customerPhone, customerName, messageId,
+          vendorId, customerPhone, customerName: customerName ?? '', messageId,
           type: 'location',
           location: {
-            lat: msg.message.locationMessage.degreesLatitude!,
-            lng: msg.message.locationMessage.degreesLongitude!
+            lat: msg.message.locationMessage.degreesLatitude ?? 0,
+            lng: msg.message.locationMessage.degreesLongitude ?? 0
           },
           timestamp: ts
         };
@@ -170,10 +180,10 @@ async function startSock(vendorId: string) {
         console.log(`🎙️ [Vendor ${vendorId}] Voice note from ${customerPhone} — transcribing...`);
         const transcription = await transcribeAudio(msg);
         if (transcription) {
-          jobData = { vendorId, customerPhone, customerName, messageId, type: 'text', content: transcription, timestamp: ts };
+          jobData = { vendorId, customerPhone, customerName: customerName ?? '', messageId, type: 'text', content: transcription, timestamp: ts };
           console.log(`🎙️ Transcribed: "${transcription}"`);
         } else {
-          jobData = { vendorId, customerPhone, customerName, messageId, type: 'text', content: "[Voice note received but could not be transcribed. Please type your message.]", timestamp: ts };
+          jobData = { vendorId, customerPhone, customerName: customerName ?? '', messageId, type: 'text', content: "[Voice note received but could not be transcribed. Please type your message.]", timestamp: ts };
         }
       }
 
@@ -202,15 +212,10 @@ new Worker<OutboundMessageJob>(OUTBOUND_QUEUE, async (job) => {
     throw new Error(`Socket not authenticated for vendor ${vendorId}`);
   }
 
-  const isConnected = (sock as any).ws?.readyState === 1;
-  if (!isConnected) {
-    console.error(`📤 [Vendor ${vendorId}] WebSocket connection is not OPEN (readyState: ${(sock as any).ws?.readyState}) — will retry`);
-    throw new Error(`Socket connection not open for vendor ${vendorId}`);
-  }
-
-  let cleanJid = remoteJid;
-  if (remoteJid.endsWith('@s.whatsapp.net')) {
-    const num = remoteJid.split('@')[0].replace(/\D/g, '');
+  let cleanJid = remoteJid || '';
+  if (cleanJid.endsWith('@s.whatsapp.net')) {
+    const parts = cleanJid.split('@');
+    const num = (parts[0] || '').replace(/\D/g, '');
     cleanJid = `${num}@s.whatsapp.net`;
   }
 
@@ -222,12 +227,17 @@ new Worker<OutboundMessageJob>(OUTBOUND_QUEUE, async (job) => {
     console.error(`❌ [Vendor ${vendorId}] sendMessage failed:`, err.message);
     throw err; // let BullMQ retry
   }
-}, { connection: redisConnection, concurrency: 5 });
+}, { connection: redisConnection as any, concurrency: 5 });
 
 async function startAll() {
-  const vendors = await prisma.vendor.findMany({ select: { id: true } });
-  console.log(`🚀 Fleet starting sockets for ${vendors.length} vendor(s)`);
-  await Promise.allSettled(vendors.map(v => startSock(v.id.toString())));
+  try {
+    const vendors = await prisma.vendor.findMany({ select: { id: true } });
+    console.log(`🚀 Fleet starting sockets for ${vendors.length} vendor(s)`);
+    await Promise.allSettled(vendors.map(v => startSock(v.id.toString())));
+  } catch (err: any) {
+    console.error('⚠️ Fleet startup database query failed, retrying in 5s:', err.message);
+    setTimeout(startAll, 5000);
+  }
 }
 
 // Pick up new vendors registered after startup (polls every 60s)
@@ -245,5 +255,29 @@ setInterval(async () => {
     console.error('Fleet poll error:', err);
   }
 }, 60_000);
+
+// Listen for control commands (e.g. restart socket for fresh QR/pairing code)
+const fleetSub = redisConnection.duplicate();
+fleetSub.subscribe('fleet_control');
+fleetSub.on('message', async (channel, message) => {
+  if (channel === 'fleet_control') {
+    try {
+      const payload = JSON.parse(message);
+      if (payload.action === 'restart_socket' && payload.vendorId) {
+        const vid = payload.vendorId.toString();
+        console.log(`🔄 [Vendor ${vid}] Command received: restart_socket — re-initializing Baileys socket...`);
+        const existing = socketMap.get(vid);
+        if (existing) {
+          socketMap.delete(vid);
+          try { (existing as any)?.ws?.close(); } catch {}
+          try { existing?.end(undefined); } catch {}
+        }
+        await startSock(vid);
+      }
+    } catch (err) {
+      console.error('fleet_control message error:', err);
+    }
+  }
+});
 
 startAll().catch(err => console.error('Fleet startup failed:', err));

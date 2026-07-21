@@ -167,7 +167,7 @@ export default function Orders() {
         </div>
 
         {/* Stats */}
-        <div className="stat-grid animate-fade-up-1" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1.25rem' }}>
+        <div className="stat-grid animate-fade-up-1" style={{ marginBottom: '1.25rem' }}>
           {[
             { label: 'Pending payment', value: totals.pending, Icon: Clock3, color: '#d97706', bg: 'rgba(245,158,11,0.1)' },
             { label: 'Paid orders', value: totals.paid, Icon: CreditCard, color: '#16a34a', bg: 'rgba(22,163,74,0.1)' },

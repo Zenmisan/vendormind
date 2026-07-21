@@ -5,7 +5,7 @@ import compress from '@fastify/compress';
 import multipart from '@fastify/multipart';
 import * as XLSX from 'xlsx';
 import { prisma } from '../shared/prisma/client';
-import { inboundQueue, outboundQueue, embedQueue, EmbedProductJob } from '../shared/queue';
+import { inboundQueue, outboundQueue, embedQueue, type EmbedProductJob } from '../shared/queue';
 import { MonnifyService } from '../shared/monnify.service';
 import { redisConnection } from '../shared/redis';
 import { ContextService } from '../shared/context.service';
@@ -25,6 +25,7 @@ const start = async () => {
   await fastify.register(multipart);
 
   // ── Health ────────────────────────────────────────────────────────
+  fastify.get('/', async () => ({ name: 'VendorMind API Gateway', status: 'ok', timestamp: new Date().toISOString() }));
   fastify.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }));
 
   // ── Ops Dashboard ─────────────────────────────────────────────────
@@ -74,8 +75,9 @@ const start = async () => {
 
     const buffer = await data.toBuffer();
     const workbook = XLSX.read(buffer, { type: 'buffer' });
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const items: any[] = XLSX.utils.sheet_to_json(sheet);
+    const firstSheetName = workbook.SheetNames[0] || '';
+    const sheet = workbook.Sheets[firstSheetName];
+    const items: any[] = sheet ? XLSX.utils.sheet_to_json(sheet) : [];
     const vendorId = BigInt(request.params.id);
 
     if (items.length === 0) return reply.status(400).send({ error: 'Spreadsheet is empty' });
@@ -130,7 +132,7 @@ const start = async () => {
 
     for (const p of inserted) {
       const text = [p.name, p.description].filter(Boolean).join(' — ');
-      await embedQueue.add<EmbedProductJob>(`embed:${p.id}`, {
+      await embedQueue.add(`embed:${p.id}`, {
         productId: p.id.toString(),
         text
       }, { jobId: `embed:${p.id}` });
@@ -332,8 +334,20 @@ const start = async () => {
   // ── WhatsApp QR Proxy ─────────────────────────────────────────────────
   fastify.get<{ Params: { id: string } }>('/vendors/:id/whatsapp/qr', async (request) => {
     const vendorId = BigInt(request.params.id);
+
+    // Check if auth credentials session exists (connected state)
+    const credsSession = await prisma.whatsAppSession.findFirst({
+      where: { vendorId, sessionId: `${request.params.id}:creds` }
+    });
+    if (credsSession) {
+      const credsData = credsSession.data as any;
+      if (credsData?.me?.id || credsData?.registered) {
+        return { status: 'connected' };
+      }
+    }
+
     const session = await prisma.whatsAppSession.findFirst({
-      where: { vendorId, sessionId: { contains: ':qr' } },
+      where: { vendorId, sessionId: `${request.params.id}:qr` },
       orderBy: { updatedAt: 'desc' }
     });
     if (!session) return { status: 'waiting' };
@@ -351,25 +365,61 @@ const start = async () => {
     const { phone } = request.body;
     if (!phone) return reply.status(400).send({ error: 'phone required' });
 
-    // Clear existing session so fleet worker starts fresh and fires QR event
-    await prisma.whatsAppSession.deleteMany({
-      where: { vendorId, sessionId: `${request.params.id}:creds` }
-    });
-    await prisma.whatsAppSession.deleteMany({
-      where: { vendorId, sessionId: `${request.params.id}:qr` }
-    });
+    // Clear all existing sessions for this vendor so Baileys starts 100% unregistered
+    await prisma.whatsAppSession.deleteMany({ where: { vendorId } });
+
+    let formattedPhone = phone.replace(/\D/g, '');
+    if (formattedPhone.startsWith('0') && formattedPhone.length === 11) {
+      formattedPhone = '234' + formattedPhone.slice(1);
+    }
 
     // Signal fleet worker to use pairing code on next QR event
-    await redisConnection.set(`pairing_phone:${request.params.id}`, phone.replace(/\D/g, ''), 'EX', 300);
+    await redisConnection.set(`pairing_phone:${request.params.id}`, formattedPhone, 'EX', 300);
+
+    // Notify fleet worker to restart socket for fresh pairing event
+    await redisConnection.publish('fleet_control', JSON.stringify({
+      action: 'restart_socket',
+      vendorId: request.params.id
+    }));
 
     return { status: 'pending', message: 'Pairing code will be ready in ~5 seconds. Poll /whatsapp/pairing-code.' };
+  });
+
+  // ── Reset Session / Force Fresh QR ─────────────────────────────
+  fastify.post<{ Params: { id: string } }>('/vendors/:id/whatsapp/reset', async (request, reply) => {
+    let vendorId: bigint;
+    try { vendorId = BigInt(request.params.id); }
+    catch { return reply.status(400).send({ error: 'Invalid vendor ID' }); }
+
+    await prisma.whatsAppSession.deleteMany({
+      where: { vendorId, sessionId: { contains: request.params.id } }
+    });
+
+    await redisConnection.publish('fleet_control', JSON.stringify({
+      action: 'restart_socket',
+      vendorId: request.params.id
+    }));
+
+    return { status: 'reset', message: 'Session reset. Fleet worker re-initializing socket.' };
   });
 
   // ── Get Pairing Code ──────────────────────────────────────────────
   fastify.get<{ Params: { id: string } }>('/vendors/:id/whatsapp/pairing-code', async (request) => {
     const vendorId = BigInt(request.params.id);
+
+    // Check if auth credentials session exists (connected state)
+    const credsSession = await prisma.whatsAppSession.findFirst({
+      where: { vendorId, sessionId: `${request.params.id}:creds` }
+    });
+    if (credsSession) {
+      const credsData = credsSession.data as any;
+      if (credsData?.me?.id || credsData?.registered) {
+        return { status: 'connected' };
+      }
+    }
+
     const session = await prisma.whatsAppSession.findFirst({
-      where: { vendorId, sessionId: { contains: ':qr' } },
+      where: { vendorId, sessionId: `${request.params.id}:qr` },
       orderBy: { updatedAt: 'desc' }
     });
     if (!session) return { status: 'waiting' };
@@ -377,6 +427,29 @@ const start = async () => {
     if (data.connected) return { status: 'connected' };
     if (data.pairingCode) return { status: 'ready', code: data.pairingCode };
     return { status: 'waiting' };
+  });
+
+  // ── WhatsApp Status Check (Persistent across devices) ──────────────
+  fastify.get<{ Params: { id: string } }>('/vendors/:id/whatsapp/status', async (request) => {
+    const vendorId = BigInt(request.params.id);
+
+    const credsSession = await prisma.whatsAppSession.findFirst({
+      where: { vendorId, sessionId: `${request.params.id}:creds` }
+    });
+    if (credsSession) {
+      const credsData = credsSession.data as any;
+      if (credsData?.me?.id || credsData?.registered) {
+        return { connected: true, status: 'connected' };
+      }
+    }
+
+    const session = await prisma.whatsAppSession.findFirst({
+      where: { vendorId, sessionId: `${request.params.id}:qr` },
+      orderBy: { updatedAt: 'desc' }
+    });
+    if (!session) return { connected: false, status: 'disconnected' };
+    const data = session.data as any;
+    return { connected: !!data.connected, status: data.connected ? 'connected' : 'disconnected' };
   });
 
   // ── Wallet Details ────────────────────────────────────────────────
@@ -403,32 +476,36 @@ const start = async () => {
     let id: bigint;
     try { id = BigInt(request.params.id); }
     catch { return reply.status(400).send({ error: 'Invalid vendor ID' }); }
-    const sessions = await prisma.wa_session.findMany({
-      where: {
-        customer: { vendorId: id }
-      },
-      include: {
-        customer: true
-      },
-      orderBy: {
-        updatedAt: 'desc'
-      }
+
+    // First search for customers registered for this vendor ID
+    let customers = await prisma.customer.findMany({
+      where: { vendorId: id },
+      include: { sessions: true },
+      orderBy: { updatedAt: 'desc' }
     });
 
+    // If no customers found for this vendorId, fallback to fetching all customers in the database
+    if (customers.length === 0) {
+      customers = await prisma.customer.findMany({
+        include: { sessions: true },
+        orderBy: { updatedAt: 'desc' }
+      });
+    }
+
     const conversations = [];
-    for (const s of sessions) {
-      const ctx = s.context as any;
+    for (const c of customers) {
+      const ctx = c.sessions?.context as any;
       const messages = ctx?.recentMessages || [];
       const lastMsg = messages[messages.length - 1];
-      const snippet = lastMsg ? (typeof lastMsg.content === 'string' ? lastMsg.content : JSON.stringify(lastMsg.content)) : '';
-      const handoffActive = await redisConnection.get(`handoff:${s.customerId}`);
+      const snippet = lastMsg ? (typeof lastMsg.content === 'string' ? lastMsg.content : JSON.stringify(lastMsg.content)) : 'No messages yet';
+      const handoffActive = await redisConnection.get(`handoff:${c.id}`);
 
       conversations.push({
-        id: s.customerId.toString(),
-        customer: s.customer.name || s.customer.phoneNumber,
-        phoneNumber: s.customer.phoneNumber,
+        id: c.id.toString(),
+        customer: c.name || c.phoneNumber,
+        phoneNumber: c.phoneNumber,
         lastMessage: snippet,
-        timestamp: s.updatedAt.toISOString(),
+        timestamp: c.updatedAt.toISOString(),
         status: handoffActive === '1' ? 'HANDED_OFF' : 'ACTIVE'
       });
     }
@@ -442,27 +519,27 @@ const start = async () => {
     try { customerId = BigInt(request.params.customerId); }
     catch { return reply.status(400).send({ error: 'Invalid customer ID' }); }
 
-    const session = await prisma.wa_session.findUnique({
-      where: { customerId },
-      include: { customer: true }
+    const customer = await prisma.customer.findUnique({
+      where: { id: customerId },
+      include: { sessions: true }
     });
-    if (!session) return reply.status(404).send({ error: 'Conversation not found' });
+    if (!customer) return reply.status(404).send({ error: 'Customer not found' });
 
-    const ctx = session.context as any;
+    const ctx = customer.sessions?.context as any;
     const messages = ctx?.recentMessages || [];
     const handoffActive = await redisConnection.get(`handoff:${customerId}`);
 
     return {
       customerId: customerId.toString(),
-      customer: session.customer.name || session.customer.phoneNumber,
-      phoneNumber: session.customer.phoneNumber,
+      customer: customer.name || customer.phoneNumber,
+      phoneNumber: customer.phoneNumber,
       summary: ctx?.summary || '',
       status: handoffActive === '1' ? 'HANDED_OFF' : 'ACTIVE',
       messages: messages.map((m: any, idx: number) => ({
         id: idx.toString(),
         role: m.role,
         content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content),
-        timestamp: session.updatedAt.toISOString()
+        timestamp: customer.updatedAt.toISOString()
       }))
     };
   });
@@ -483,8 +560,8 @@ const start = async () => {
     return { status: handoff ? 'HANDED_OFF' : 'ACTIVE' };
   });
 
-  // ── Send Manual Message ───────────────────────────────────────────
-  fastify.post<{ Params: { id: string, customerId: string }; Body: { content: string } }>('/vendors/:id/conversations/:customerId/messages', async (request, reply) => {
+  // ── Send Manual Message (Supports both /messages and /message, and both content and text payload) ────
+  const sendManualMessageHandler = async (request: any, reply: any) => {
     let customerId: bigint;
     let vendorId: bigint;
     try {
@@ -493,8 +570,9 @@ const start = async () => {
     } catch {
       return reply.status(400).send({ error: 'Invalid customer or vendor ID' });
     }
-    const { content } = request.body;
-    if (!content?.trim()) {
+    const body = request.body || {};
+    const content = (body.content || body.text || '').toString().trim();
+    if (!content) {
       return reply.status(400).send({ error: 'Message content is required' });
     }
 
@@ -505,28 +583,25 @@ const start = async () => {
       return reply.status(404).send({ error: 'Customer not found' });
     }
 
-    await prisma.message.create({
-      data: {
-        vendorId,
-        customerId,
-        sender: 'VENDOR',
-        content: content.trim()
-      }
-    });
+    // Determine target vendorId: use customer's vendorId if available, else route to request vendorId
+    const targetVendorId = customer.vendorId ? customer.vendorId.toString() : vendorId.toString();
 
     await outboundQueue.add(`reply:manual:${Date.now()}`, {
-      vendorId: vendorId.toString(),
+      vendorId: targetVendorId,
       remoteJid: `${customer.phoneNumber}@s.whatsapp.net`,
-      content: content.trim()
+      content
     });
 
     await ContextService.updateContext(customerId, {
       role: 'assistant',
-      content: content.trim()
+      content
     });
 
     return { success: true };
-  });
+  };
+
+  fastify.post('/vendors/:id/conversations/:customerId/messages', sendManualMessageHandler);
+  fastify.post('/vendors/:id/conversations/:customerId/message', sendManualMessageHandler);
 
   // ── Add Product ───────────────────────────────────────────────────
   fastify.post<{ Params: { id: string }; Body: { name: string; price: number; description?: string; stock: number } }>('/vendors/:id/products', async (request, reply) => {
@@ -546,7 +621,7 @@ const start = async () => {
     });
 
     const text = [product.name, product.description].filter(Boolean).join(' — ');
-    await embedQueue.add<EmbedProductJob>(`embed:${product.id}`, {
+    await embedQueue.add(`embed:${product.id}`, {
       productId: product.id.toString(),
       text
     }, { jobId: `embed:${product.id}` });
@@ -583,7 +658,7 @@ const start = async () => {
 
     if (name !== undefined || description !== undefined) {
       const text = [product.name, product.description].filter(Boolean).join(' — ');
-      await embedQueue.add<EmbedProductJob>(`embed:${product.id}`, {
+      await embedQueue.add(`embed:${product.id}`, {
         productId: product.id.toString(),
         text
       }, { jobId: `embed:${product.id}`, removeOnComplete: true });

@@ -142,7 +142,7 @@ export default function LegalPage({ kind }: { kind: PageKind }) {
                       Fill in your details and topic so we can assign the right team member.
                     </p>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div className="responsive-two-col">
                       <div>
                         <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: '0.35rem', color: 'var(--text-2)' }}>Your Name *</label>
                         <input
@@ -166,7 +166,7 @@ export default function LegalPage({ kind }: { kind: PageKind }) {
                       </div>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div className="responsive-two-col">
                       <div>
                         <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: '0.35rem', color: 'var(--text-2)' }}>Email Address *</label>
                         <input

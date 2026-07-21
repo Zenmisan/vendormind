@@ -43,26 +43,26 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState(new Date());
 
-  const VENDOR_ID = localStorage.getItem('vendorId') ?? '1';
+  const getVendorId = () => localStorage.getItem('vendorId') ?? '1';
 
-  const load = async () => {
-    setLoading(true);
+  const load = async (isInitial = false) => {
+    if (isInitial && !ops) setLoading(true);
     try {
       const [opsRes, ordersRes, waRes, walletRes] = await Promise.all([
         fetch(`${API}/ops/dashboard`),
-        fetch(`${API}/vendors/${VENDOR_ID}/orders?limit=5`),
-        fetch(`${API}/vendors/${VENDOR_ID}/whatsapp/qr`),
-        fetch(`${API}/vendors/${VENDOR_ID}/wallet`)
+        fetch(`${API}/vendors/${getVendorId()}/orders?limit=5`),
+        fetch(`${API}/vendors/${getVendorId()}/whatsapp/status`),
+        fetch(`${API}/vendors/${getVendorId()}/wallet`)
       ]);
 
-      if (opsRes.ok) setOps(await opsRes.ok ? await opsRes.json() : null);
+      if (opsRes.ok) setOps(await opsRes.json());
       if (ordersRes.ok) {
         const data = await ordersRes.json() as { orders: Order[] };
         setOrders(data.orders || []);
       }
       if (waRes.ok) {
-        const data = await waRes.json() as { status: string };
-        setWaConnected(data.status === 'connected');
+        const data = await waRes.json() as { connected: boolean; status: string };
+        setWaConnected(data.connected || data.status === 'connected');
       }
       if (walletRes.ok) {
         const data = await walletRes.json() as { balance: number };
@@ -70,24 +70,25 @@ export default function Dashboard() {
       }
     } catch (err) {
       console.error('Failed to load dashboard data:', err);
+    } finally {
+      if (isInitial) setLoading(false);
+      setLastRefresh(new Date());
     }
-    setLoading(false);
-    setLastRefresh(new Date());
   };
 
   useEffect(() => {
-    load();
-    // Poll WA status every 30s so disconnections reflect without manual refresh
+    load(true);
+    // Poll WA status quietly every 15s so disconnections/connections reflect in-place without page refresh
     const waInterval = setInterval(async () => {
       try {
-        const res = await fetch(`${API}/vendors/${VENDOR_ID}/whatsapp/qr`);
+        const res = await fetch(`${API}/vendors/${getVendorId()}/whatsapp/status`);
         if (res.ok) {
-          const data = await res.json() as { status: string };
-          setWaConnected(data.status === 'connected');
+          const data = await res.json() as { connected: boolean; status: string };
+          setWaConnected(data.connected || data.status === 'connected');
           setLastRefresh(new Date());
         }
       } catch {}
-    }, 30_000);
+    }, 15_000);
     return () => clearInterval(waInterval);
   }, []);
 
@@ -146,7 +147,7 @@ export default function Dashboard() {
           </button>
         </div>
 
-        <div className="stat-grid animate-fade-up-1" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
+        <div className="stat-grid animate-fade-up-1" style={{ marginBottom: '1.5rem' }}>
           {stats.map(s => (
             <div key={s.label} className="stat-card">
               <div className="stat-card-icon" style={{ background: s.bg }}>
@@ -159,7 +160,7 @@ export default function Dashboard() {
           ))}
         </div>
 
-        <div className="dashboard-grid animate-fade-up-2" style={{ display: 'grid', gridTemplateColumns: '1.35fr 0.65fr', gap: '1.25rem' }}>
+        <div className="dashboard-grid animate-fade-up-2">
           <section className="card" style={{ padding: '1.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', marginBottom: '1.25rem' }}>
               <div>
@@ -255,7 +256,7 @@ export default function Dashboard() {
 
       {showReconnectModal && (
         <WhatsAppConnectModal
-          vendorId={VENDOR_ID}
+          vendorId={getVendorId()}
           onConnected={() => {
             setWaConnected(true);
             setShowReconnectModal(false);

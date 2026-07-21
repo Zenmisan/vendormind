@@ -1,5 +1,5 @@
 import { Worker } from 'bullmq';
-import { INBOUND_QUEUE, InboundMessageJob, outboundQueue } from '../shared/queue';
+import { INBOUND_QUEUE, type InboundMessageJob, outboundQueue } from '../shared/queue';
 import { redisConnection } from '../shared/redis';
 import { prisma } from '../shared/prisma/client';
 import { ContextService } from '../shared/context.service';
@@ -105,7 +105,17 @@ const worker = new Worker<InboundMessageJob>(
         return;
       }
 
-      // 6. Load context
+      // 6. Save user message into context immediately so dashboard updates in real-time
+      let userMsgText = '';
+      if (type === 'text' && content) userMsgText = content;
+      else if (type === 'location' && location) userMsgText = `[User sent precise location: Lat ${location.lat}, Lng ${location.lng}]`;
+      else userMsgText = '[Media message]';
+
+      if (userMsgText) {
+        await ContextService.updateContext(customer.id, { role: 'user', content: userMsgText });
+      }
+
+      // Reload context including newly saved user message
       const context = await ContextService.getContext(customer.id);
 
       // 7. Route by message type & run agent
@@ -120,23 +130,17 @@ const worker = new Worker<InboundMessageJob>(
         responseText = useLLM
           ? await AgentService.process(customer.id, vId, content, context)
           : await MockAgentService.process(content, context);
-        if (responseText === '__STAND_DOWN__') {
-          console.log(`\uD83D\uDE07 Stand-down triggered: "${content}" is classified as personal. Skipping reply.`);
-          return;
-        }
-        await ContextService.updateContext(customer.id, { role: 'user', content });
       } else if (type === 'location' && location) {
-        const locationNote = `[User sent precise location: Lat ${location.lat}, Lng ${location.lng}]`;
         responseText = useLLM
-          ? await AgentService.process(customer.id, vId, locationNote, context)
-          : await MockAgentService.process(locationNote, context);
-        if (responseText === '__STAND_DOWN__') {
-          console.log(`\uD83D\uDE07 Stand-down triggered: location classification personal. Skipping reply.`);
-          return;
-        }
-        await ContextService.updateContext(customer.id, { role: 'user', content: locationNote });
+          ? await AgentService.process(customer.id, vId, userMsgText, context)
+          : await MockAgentService.process(userMsgText, context);
       } else {
         responseText = "I can only process text and location messages right now.";
+      }
+
+      if (responseText === '__STAND_DOWN__') {
+        console.log(`😇 Stand-down triggered for "${userMsgText}". Message saved to context, skipping bot reply.`);
+        return;
       }
 
       // 8. Update context with assistant response
@@ -159,7 +163,7 @@ const worker = new Worker<InboundMessageJob>(
       throw error;
     }
   },
-  { connection: redisConnection }
+  { connection: redisConnection as any }
 );
 
 console.log('👷 Inbound Processor started');

@@ -113,7 +113,7 @@ export default function WalletPage() {
         </div>
 
         {/* Content split */}
-        <div className="dashboard-grid animate-fade-up-1" style={{ display: 'grid', gridTemplateColumns: '1.25fr 0.75fr', gap: '1.5rem', alignItems: 'start' }}>
+        <div className="dashboard-grid animate-fade-up-1" style={{ alignItems: 'start' }}>
           {/* Left section: balance, transactions */}
           <div style={{ display: 'grid', gap: '1.5rem' }}>
             {/* Balance banner */}

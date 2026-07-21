@@ -6,7 +6,7 @@ import {
 import Sidebar from '../components/Sidebar';
 
 const API = (import.meta as any)?.env?.VITE_API_URL ?? 'http://localhost:3000';
-const VENDOR_ID = localStorage.getItem('vendorId') ?? '1';
+const getVendorId = () => localStorage.getItem('vendorId') ?? '1';
 
 interface Conversation {
   id: string;
@@ -49,10 +49,10 @@ export default function Conversations() {
     return phone.replace(/(\+\d{3}\s?\d{2})\d{3}(\d{4})/, '$1***$2');
   };
 
-  const loadList = async () => {
-    setLoadingList(true);
+  const loadList = async (silent = false) => {
+    if (!silent && conversations.length === 0) setLoadingList(true);
     try {
-      const res = await fetch(`${API}/vendors/${VENDOR_ID}/conversations`);
+      const res = await fetch(`${API}/vendors/${getVendorId()}/conversations`);
       if (res.ok) {
         const data = await res.json() as { conversations: Conversation[] };
         setConversations(data.conversations ?? []);
@@ -60,14 +60,14 @@ export default function Conversations() {
     } catch (err) {
       console.error('Failed to load conversations:', err);
     } finally {
-      setLoadingList(false);
+      if (!silent) setLoadingList(false);
     }
   };
 
-  const loadDetail = async (customerId: string) => {
-    setLoadingDetail(true);
+  const loadDetail = async (customerId: string, silent = false) => {
+    if (!silent) setLoadingDetail(true);
     try {
-      const res = await fetch(`${API}/vendors/${VENDOR_ID}/conversations/${customerId}`);
+      const res = await fetch(`${API}/vendors/${getVendorId()}/conversations/${customerId}`);
       if (res.ok) {
         const data = await res.json() as ConversationDetail;
         setDetail(data);
@@ -75,7 +75,7 @@ export default function Conversations() {
     } catch (err) {
       console.error('Failed to load conversation details:', err);
     } finally {
-      setLoadingDetail(false);
+      if (!silent) setLoadingDetail(false);
     }
   };
 
@@ -84,7 +84,7 @@ export default function Conversations() {
     setToggleHandoffLoading(true);
     const newHandoffState = detail.status !== 'HANDED_OFF';
     try {
-      const res = await fetch(`${API}/vendors/${VENDOR_ID}/conversations/${detail.customerId}/handoff`, {
+      const res = await fetch(`${API}/vendors/${getVendorId()}/conversations/${detail.customerId}/handoff`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ handoff: newHandoffState }),
@@ -108,15 +108,15 @@ export default function Conversations() {
     if (!typedMessage.trim() || !detail) return;
     setSendLoading(true);
     try {
-      const res = await fetch(`${API}/vendors/${VENDOR_ID}/conversations/${detail.customerId}/messages`, {
+      const res = await fetch(`${API}/vendors/${getVendorId()}/conversations/${detail.customerId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: typedMessage.trim() }),
+        body: JSON.stringify({ content: typedMessage.trim(), text: typedMessage.trim() }),
       });
       if (res.ok) {
-        const newMsg = {
-          id: `local-${Date.now()}`,
-          role: 'assistant' as const,
+        const newMsg: Message = {
+          id: 'temp-' + Date.now(),
+          role: 'assistant',
           content: typedMessage.trim(),
           timestamp: new Date().toISOString()
         };
