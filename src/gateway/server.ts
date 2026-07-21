@@ -5,7 +5,7 @@ import compress from '@fastify/compress';
 import multipart from '@fastify/multipart';
 import * as XLSX from 'xlsx';
 import { prisma } from '../shared/prisma/client';
-import { inboundQueue, outboundQueue, embedQueue, EmbedProductJob } from '../shared/queue';
+import { inboundQueue, outboundQueue, embedQueue, type EmbedProductJob } from '../shared/queue';
 import { MonnifyService } from '../shared/monnify.service';
 import { redisConnection } from '../shared/redis';
 import { ContextService } from '../shared/context.service';
