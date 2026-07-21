@@ -22,9 +22,9 @@ export class AIService {
     tools: any[]
   ): Promise<AIProviderResponse> {
     const chain = [
-      { name: 'Claude', fn: () => this.callClaude(systemPrompt, messages, tools) },
+      { name: 'Groq', fn: () => this.callGroq(systemPrompt, messages, tools) },
       { name: 'Gemini', fn: () => this.callGemini(systemPrompt, messages, tools) },
-      { name: 'Groq', fn: () => this.callGroq(systemPrompt, messages, tools) }
+      { name: 'Claude', fn: () => this.callClaude(systemPrompt, messages, tools) }
     ];
 
     for (const provider of chain) {
