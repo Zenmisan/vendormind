@@ -18,6 +18,13 @@ export default function WhatsAppConnectModal({ vendorId, onConnected, onClose }:
   const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [pairingLoading, setPairingLoading] = useState(false);
 
+  // Trigger fresh QR socket on QR mode select
+  useEffect(() => {
+    if (authMode === 'qr' && !connected) {
+      fetch(`${API}/vendors/${vendorId}/whatsapp/reset`, { method: 'POST' }).catch(() => {});
+    }
+  }, [authMode, connected, vendorId]);
+
   // QR polling
   useEffect(() => {
     if (authMode !== 'qr' || connected) return;

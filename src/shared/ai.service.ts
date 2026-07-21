@@ -84,7 +84,7 @@ export class AIService {
 
   private static async callClaude(system: string, messages: Anthropic.MessageParam[], tools: any[]): Promise<AIProviderResponse> {
     const response = await this.anthropic.messages.create({
-      model: "claude-sonnet-4-6",
+      model: "claude-3-5-sonnet-20241022",
       max_tokens: 4096,
       system,
       messages,
@@ -137,7 +137,7 @@ export class AIService {
 
   private static async callGemini(system: string, messages: Anthropic.MessageParam[], tools: any[]): Promise<AIProviderResponse> {
     const model = this.gemini.getGenerativeModel({ 
-      model: "gemini-2.5-flash",
+      model: "gemini-1.5-flash",
       systemInstruction: system,
       tools: [{ 
         functionDeclarations: tools.map(t => ({
@@ -178,7 +178,7 @@ export class AIService {
 
     try {
       const response = await this.groq.chat.completions.create({
-        model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+        model: 'llama-3.3-70b-versatile',
         messages: groqMessages,
         tools: groqTools,
         tool_choice: 'auto',
@@ -195,10 +195,10 @@ export class AIService {
 
       return { content: msg.content || '', toolCalls: toolCalls?.length ? toolCalls : undefined };
     } catch (toolErr: any) {
-      // Tool calling failed (common on some Groq models) — retry as plain text
-      console.warn('⚠️ Groq tool calling failed, retrying as plain text...');
+      // Tool calling failed — retry with fast model or plain text
+      console.warn('⚠️ Groq tool calling failed, retrying with llama-3.1-8b-instant...');
       const fallback = await this.groq.chat.completions.create({
-        model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+        model: 'llama-3.1-8b-instant',
         messages: groqMessages,
         max_tokens: 1024,
       } as any);

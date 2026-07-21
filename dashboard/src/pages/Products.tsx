@@ -216,7 +216,7 @@ export default function Products() {
         </div>
 
         {/* Stats */}
-        <div className="stat-grid animate-fade-up-1" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1.25rem' }}>
+        <div className="stat-grid animate-fade-up-1" style={{ marginBottom: '1.25rem' }}>
           {[
             { label: 'Catalog items', value: displayProducts.length, Icon: Package, color: '#16a34a', bg: 'rgba(22,163,74,0.1)' },
             { label: 'Total stock', value: totalStock, Icon: FileSpreadsheet, color: '#3b82f6', bg: 'rgba(59,130,246,0.1)' },

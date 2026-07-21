@@ -488,7 +488,7 @@ export default function Landing() {
           </h2>
           <p style={{ fontSize: '0.95rem', color: 'var(--text-2)', margin: 0 }}>No monthly fees. No contracts. Pay only for what you use.</p>
         </div>
-        <div ref={pricingRef} className="reveal-block" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '1rem' }}>
+        <div ref={pricingRef} className="reveal-block landing-pricing-grid">
           <div className="pricing-card">
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
               <div>
@@ -515,7 +515,7 @@ export default function Landing() {
                 Overdraft buffer of ₦1,250 included to finish active conversations even on an empty balance.
               </p>
             </div>
-            <button className="btn-primary" onClick={handleGetStarted} style={{ width: '100%', padding: '0.875rem', background: '#4ade80', color: '#0d1117', boxShadow: '0 4px 16px rgba(74,222,128,0.25)' }}>
+            <button className="btn-primary" onClick={handleGetStarted} style={{ marginTop: 'auto', width: '100%', padding: '0.875rem', background: '#4ade80', color: '#0d1117', boxShadow: '0 4px 16px rgba(74,222,128,0.25)' }}>
               Start with free credit <ArrowRight size={15} />
             </button>
           </div>
@@ -547,7 +547,7 @@ export default function Landing() {
                 Built for vendors who need a steady balance for daily orders and replies.
               </p>
             </div>
-            <button className="btn-primary" onClick={handleGetStarted} style={{ width: '100%', padding: '0.875rem', background: '#60a5fa', color: '#0d1117', boxShadow: '0 4px 16px rgba(96,165,250,0.25)' }}>
+            <button className="btn-primary" onClick={handleGetStarted} style={{ marginTop: 'auto', width: '100%', padding: '0.875rem', background: '#60a5fa', color: '#0d1117', boxShadow: '0 4px 16px rgba(96,165,250,0.25)' }}>
               Choose Growth <ArrowRight size={15} />
             </button>
           </div>
@@ -579,7 +579,7 @@ export default function Landing() {
                 Best fit for stores that want more headroom and less wallet interruption.
               </p>
             </div>
-            <button className="btn-primary" onClick={handleGetStarted} style={{ width: '100%', padding: '0.875rem', background: '#c084fc', color: '#0d1117', boxShadow: '0 4px 16px rgba(192,132,252,0.25)' }}>
+            <button className="btn-primary" onClick={handleGetStarted} style={{ marginTop: 'auto', width: '100%', padding: '0.875rem', background: '#c084fc', color: '#0d1117', boxShadow: '0 4px 16px rgba(192,132,252,0.25)' }}>
               Choose Scale <ArrowRight size={15} />
             </button>
           </div>

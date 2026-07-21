@@ -35,7 +35,15 @@ async function transcribeAudio(msg: any): Promise<string | null> {
 }
 
 async function startSock(vendorId: string) {
-  if (socketMap.has(vendorId)) return;
+  if (socketMap.has(vendorId)) {
+    const activeSock = socketMap.get(vendorId);
+    if ((activeSock as any)?.ws?.readyState === 1 && activeSock?.user) {
+      return;
+    }
+    socketMap.delete(vendorId);
+    try { (activeSock as any)?.ws?.close(); } catch {}
+    try { activeSock?.end(undefined); } catch {}
+  }
   let reconnectCount = 0;
   const { state, saveCreds } = await usePrismaAuthState(vendorId);
   const { version, isLatest } = await fetchLatestBaileysVersion();
@@ -71,13 +79,14 @@ async function startSock(vendorId: string) {
     const { connection, lastDisconnect, qr } = update;
 
     if (qr) {
-      // Check if vendor requested pairing code instead of QR
       const pairingPhone = await redisConnection.get(`pairing_phone:${vendorId}`);
       if (pairingPhone && !state.creds.registered) {
         try {
-          const code = await sock.requestPairingCode(pairingPhone.replace(/\D/g, ''));
+          const cleanPhone = pairingPhone.replace(/\D/g, '');
+          console.log(`📱 [Vendor ${vendorId}] Requesting pairing code for ${cleanPhone}...`);
+          const code = await sock.requestPairingCode(cleanPhone);
           await redisConnection.del(`pairing_phone:${vendorId}`);
-          console.log(`📱 [Vendor ${vendorId}] Pairing code: ${code}`);
+          console.log(`📱 [Vendor ${vendorId}] Pairing code generated: ${code}`);
           await prisma.whatsAppSession.upsert({
             where: { sessionId: `${vendorId}:qr` },
             update: { data: { pairingCode: code }, updatedAt: new Date() },
@@ -111,7 +120,7 @@ async function startSock(vendorId: string) {
         await prisma.whatsAppSession.deleteMany({ where: { vendorId: vId } });
       } else if (statusCode !== 440) {
         reconnectCount++;
-        const delay = Math.min(5000 * (2 ** Math.min(reconnectCount, 4)), 60000);
+        const delay = reconnectCount === 1 ? 1000 : Math.min(2000 * (2 ** Math.min(reconnectCount, 4)), 30000);
         console.log(`[Vendor ${vendorId}] Disconnected (${statusCode}) — reconnecting in ${delay/1000}s (attempt ${reconnectCount})`);
         setTimeout(() => startSock(vendorId), delay);
       }
@@ -225,9 +234,14 @@ new Worker<OutboundMessageJob>(OUTBOUND_QUEUE, async (job) => {
 }, { connection: redisConnection, concurrency: 5 });
 
 async function startAll() {
-  const vendors = await prisma.vendor.findMany({ select: { id: true } });
-  console.log(`🚀 Fleet starting sockets for ${vendors.length} vendor(s)`);
-  await Promise.allSettled(vendors.map(v => startSock(v.id.toString())));
+  try {
+    const vendors = await prisma.vendor.findMany({ select: { id: true } });
+    console.log(`🚀 Fleet starting sockets for ${vendors.length} vendor(s)`);
+    await Promise.allSettled(vendors.map(v => startSock(v.id.toString())));
+  } catch (err: any) {
+    console.error('⚠️ Fleet startup database query failed, retrying in 5s:', err.message);
+    setTimeout(startAll, 5000);
+  }
 }
 
 // Pick up new vendors registered after startup (polls every 60s)
@@ -245,5 +259,29 @@ setInterval(async () => {
     console.error('Fleet poll error:', err);
   }
 }, 60_000);
+
+// Listen for control commands (e.g. restart socket for fresh QR/pairing code)
+const fleetSub = redisConnection.duplicate();
+fleetSub.subscribe('fleet_control');
+fleetSub.on('message', async (channel, message) => {
+  if (channel === 'fleet_control') {
+    try {
+      const payload = JSON.parse(message);
+      if (payload.action === 'restart_socket' && payload.vendorId) {
+        const vid = payload.vendorId.toString();
+        console.log(`🔄 [Vendor ${vid}] Command received: restart_socket — re-initializing Baileys socket...`);
+        const existing = socketMap.get(vid);
+        if (existing) {
+          socketMap.delete(vid);
+          try { (existing as any)?.ws?.close(); } catch {}
+          try { existing?.end(undefined); } catch {}
+        }
+        await startSock(vid);
+      }
+    } catch (err) {
+      console.error('fleet_control message error:', err);
+    }
+  }
+});
 
 startAll().catch(err => console.error('Fleet startup failed:', err));

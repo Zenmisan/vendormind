@@ -146,7 +146,7 @@ export default function Dashboard() {
           </button>
         </div>
 
-        <div className="stat-grid animate-fade-up-1" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
+        <div className="stat-grid animate-fade-up-1" style={{ marginBottom: '1.5rem' }}>
           {stats.map(s => (
             <div key={s.label} className="stat-card">
               <div className="stat-card-icon" style={{ background: s.bg }}>
@@ -159,7 +159,7 @@ export default function Dashboard() {
           ))}
         </div>
 
-        <div className="dashboard-grid animate-fade-up-2" style={{ display: 'grid', gridTemplateColumns: '1.35fr 0.65fr', gap: '1.25rem' }}>
+        <div className="dashboard-grid animate-fade-up-2">
           <section className="card" style={{ padding: '1.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', marginBottom: '1.25rem' }}>
               <div>

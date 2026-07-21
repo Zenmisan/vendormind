@@ -350,18 +350,37 @@ const start = async () => {
     const { phone } = request.body;
     if (!phone) return reply.status(400).send({ error: 'phone required' });
 
-    // Clear existing session so fleet worker starts fresh and fires QR event
-    await prisma.whatsAppSession.deleteMany({
-      where: { vendorId, sessionId: `${request.params.id}:creds` }
-    });
-    await prisma.whatsAppSession.deleteMany({
-      where: { vendorId, sessionId: `${request.params.id}:qr` }
-    });
+    // Clear all existing sessions for this vendor so Baileys starts 100% unregistered
+    await prisma.whatsAppSession.deleteMany({ where: { vendorId } });
 
     // Signal fleet worker to use pairing code on next QR event
     await redisConnection.set(`pairing_phone:${request.params.id}`, phone.replace(/\D/g, ''), 'EX', 300);
 
+    // Notify fleet worker to restart socket for fresh pairing event
+    await redisConnection.publish('fleet_control', JSON.stringify({
+      action: 'restart_socket',
+      vendorId: request.params.id
+    }));
+
     return { status: 'pending', message: 'Pairing code will be ready in ~5 seconds. Poll /whatsapp/pairing-code.' };
+  });
+
+  // ── Reset Session / Force Fresh QR ─────────────────────────────
+  fastify.post<{ Params: { id: string } }>('/vendors/:id/whatsapp/reset', async (request, reply) => {
+    let vendorId: bigint;
+    try { vendorId = BigInt(request.params.id); }
+    catch { return reply.status(400).send({ error: 'Invalid vendor ID' }); }
+
+    await prisma.whatsAppSession.deleteMany({
+      where: { vendorId, sessionId: { contains: request.params.id } }
+    });
+
+    await redisConnection.publish('fleet_control', JSON.stringify({
+      action: 'restart_socket',
+      vendorId: request.params.id
+    }));
+
+    return { status: 'reset', message: 'Session reset. Fleet worker re-initializing socket.' };
   });
 
   // ── Get Pairing Code ──────────────────────────────────────────────
