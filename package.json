@@ -30,6 +30,8 @@
     "@types/pg": "^8.20.0",
     "@types/pino": "^7.0.5",
     "prisma": "^7.8.0",
+    "puppeteer": "^25.3.0",
+    "puppeteer-core": "^25.3.0",
     "ts-node": "^10.9.2"
   },
   "peerDependencies": {

@@ -6,6 +6,8 @@
 
 ## Completed Tracks
 
+- [pitch-deck-pdf-generation](tracks/pitch_deck_pdf_generation_20260721/) — Investor Pitch Deck & Puppeteer PDF Generation: Created sleek 16:9 HTML presentation deck and rendered PDF via Puppeteer with Chromium.
+
 - [whatsapp-qr-pairing-sync-fix](tracks/whatsapp_qr_pairing_sync_fix_20260721/) — WhatsApp QR & Pairing Sync Fix: Redis control pub/sub to force Baileys socket restart for fresh QR and pairing code generation.
 
 - [full-app-responsiveness](tracks/full_app_responsiveness_20260721/) — Full App Mobile Responsiveness Overhaul: Centralized CSS grid classes, media queries, flex-wrap chips, and mobile card layouts across all pages.

@@ -15,8 +15,8 @@ const isLocal = dbUrl.includes('localhost') || dbUrl.includes('127.0.0.1');
 const pool = new pg.Pool({
   connectionString: dbUrl,
   ssl: isLocal ? false : { rejectUnauthorized: false },
-  max: 10,
-  idleTimeoutMillis: 30000,
+  max: 2,
+  idleTimeoutMillis: 10000,
   connectionTimeoutMillis: 10000,
 });
 const adapter = new PrismaPg(pool);
