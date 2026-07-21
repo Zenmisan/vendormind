@@ -24,6 +24,8 @@ const start = async () => {
   await fastify.register(multipart);
 
   // ── Health ────────────────────────────────────────────────────────
+  fastify.get('/', async () => ({ name: 'VendorMind API Gateway', status: 'ok', timestamp: new Date().toISOString() }));
+  fastify.head('/', async (request, reply) => reply.status(200).send());
   fastify.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }));
 
   // ── Ops Dashboard ─────────────────────────────────────────────────
