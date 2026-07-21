@@ -488,11 +488,11 @@ export default function Landing() {
           </h2>
           <p style={{ fontSize: '0.95rem', color: 'var(--text-2)', margin: 0 }}>No monthly fees. No contracts. Pay only for what you use.</p>
         </div>
-        <div ref={pricingRef} className="reveal-block" style={{ maxWidth: 420, margin: '0 auto' }}>
+        <div ref={pricingRef} className="reveal-block" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '1rem' }}>
           <div className="pricing-card">
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
               <div>
-                <p style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.25rem', margin: 0, letterSpacing: 0 }}>Pay-as-you-go</p>
+                <p style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.25rem', margin: 0, letterSpacing: 0 }}>Free Start</p>
                 <p style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.45)', margin: '0.25rem 0 0' }}>Wallet credits, top up anytime</p>
               </div>
               <span style={{ background: 'rgba(74,222,128,0.15)', color: '#4ade80', fontSize: '0.72rem', fontWeight: 700, padding: '0.3rem 0.75rem', borderRadius: 99, border: '1px solid rgba(74,222,128,0.2)', whiteSpace: 'nowrap' }}>
@@ -517,6 +517,70 @@ export default function Landing() {
             </div>
             <button className="btn-primary" onClick={handleGetStarted} style={{ width: '100%', padding: '0.875rem', background: '#4ade80', color: '#0d1117', boxShadow: '0 4px 16px rgba(74,222,128,0.25)' }}>
               Start with free credit <ArrowRight size={15} />
+            </button>
+          </div>
+
+          <div className="pricing-card" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+              <div>
+                <p style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.25rem', margin: 0, letterSpacing: 0 }}>Growth</p>
+                <p style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.45)', margin: '0.25rem 0 0' }}>For active stores with daily chats</p>
+              </div>
+              <span style={{ background: 'rgba(59,130,246,0.15)', color: '#60a5fa', fontSize: '0.72rem', fontWeight: 700, padding: '0.3rem 0.75rem', borderRadius: 99, border: '1px solid rgba(59,130,246,0.2)', whiteSpace: 'nowrap' }}>
+                ₦10,000
+              </span>
+            </div>
+            <div style={{ display: 'grid', gap: '0.75rem', marginBottom: '1.25rem' }}>
+              {[
+                'Everything in Free Start',
+                'Priority AI responses',
+                'Better for regular catalog traffic',
+              ].map((item) => (
+                <div key={item} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <CheckCircle size={13} color="#60a5fa" />
+                  <span style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)' }}>{item}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '1rem', marginBottom: '1.25rem' }}>
+              <p style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.35)', lineHeight: 1.6, margin: 0 }}>
+                Built for vendors who need a steady balance for daily orders and replies.
+              </p>
+            </div>
+            <button className="btn-primary" onClick={handleGetStarted} style={{ width: '100%', padding: '0.875rem', background: '#60a5fa', color: '#0d1117', boxShadow: '0 4px 16px rgba(96,165,250,0.25)' }}>
+              Choose Growth <ArrowRight size={15} />
+            </button>
+          </div>
+
+          <div className="pricing-card" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+              <div>
+                <p style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.25rem', margin: 0, letterSpacing: 0 }}>Scale</p>
+                <p style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.45)', margin: '0.25rem 0 0' }}>For high-volume stores and teams</p>
+              </div>
+              <span style={{ background: 'rgba(168,85,247,0.15)', color: '#c084fc', fontSize: '0.72rem', fontWeight: 700, padding: '0.3rem 0.75rem', borderRadius: 99, border: '1px solid rgba(168,85,247,0.2)', whiteSpace: 'nowrap' }}>
+                ₦25,000
+              </span>
+            </div>
+            <div style={{ display: 'grid', gap: '0.75rem', marginBottom: '1.25rem' }}>
+              {[
+                'Everything in Growth',
+                'Best for larger catalogs',
+                'Designed for heavier chat volume',
+              ].map((item) => (
+                <div key={item} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <CheckCircle size={13} color="#c084fc" />
+                  <span style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)' }}>{item}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '1rem', marginBottom: '1.25rem' }}>
+              <p style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.35)', lineHeight: 1.6, margin: 0 }}>
+                Best fit for stores that want more headroom and less wallet interruption.
+              </p>
+            </div>
+            <button className="btn-primary" onClick={handleGetStarted} style={{ width: '100%', padding: '0.875rem', background: '#c084fc', color: '#0d1117', boxShadow: '0 4px 16px rgba(192,132,252,0.25)' }}>
+              Choose Scale <ArrowRight size={15} />
             </button>
           </div>
         </div>
