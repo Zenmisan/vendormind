@@ -6,7 +6,7 @@ import {
 import Sidebar from '../components/Sidebar';
 
 const API = (import.meta as any)?.env?.VITE_API_URL ?? 'http://localhost:3000';
-const VENDOR_ID = localStorage.getItem('vendorId') ?? '1';
+const getVendorId = () => localStorage.getItem('vendorId') ?? '1';
 
 interface Conversation {
   id: string;
@@ -52,7 +52,7 @@ export default function Conversations() {
   const loadList = async (silent = false) => {
     if (!silent && conversations.length === 0) setLoadingList(true);
     try {
-      const res = await fetch(`${API}/vendors/${VENDOR_ID}/conversations`);
+      const res = await fetch(`${API}/vendors/${getVendorId()}/conversations`);
       if (res.ok) {
         const data = await res.json() as { conversations: Conversation[] };
         setConversations(data.conversations ?? []);
@@ -67,7 +67,7 @@ export default function Conversations() {
   const loadDetail = async (customerId: string, silent = false) => {
     if (!silent) setLoadingDetail(true);
     try {
-      const res = await fetch(`${API}/vendors/${VENDOR_ID}/conversations/${customerId}`);
+      const res = await fetch(`${API}/vendors/${getVendorId()}/conversations/${customerId}`);
       if (res.ok) {
         const data = await res.json() as ConversationDetail;
         setDetail(data);
@@ -84,7 +84,7 @@ export default function Conversations() {
     setToggleHandoffLoading(true);
     const newHandoffState = detail.status !== 'HANDED_OFF';
     try {
-      const res = await fetch(`${API}/vendors/${VENDOR_ID}/conversations/${detail.customerId}/handoff`, {
+      const res = await fetch(`${API}/vendors/${getVendorId()}/conversations/${detail.customerId}/handoff`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ handoff: newHandoffState }),
@@ -108,10 +108,10 @@ export default function Conversations() {
     if (!typedMessage.trim() || !detail) return;
     setSendLoading(true);
     try {
-      const res = await fetch(`${API}/vendors/${VENDOR_ID}/conversations/${detail.customerId}/message`, {
+      const res = await fetch(`${API}/vendors/${getVendorId()}/conversations/${detail.customerId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: typedMessage.trim() }),
+        body: JSON.stringify({ content: typedMessage.trim(), text: typedMessage.trim() }),
       });
       if (res.ok) {
         const newMsg: Message = {
