@@ -36,12 +36,14 @@ export class ContextService {
 
     if (updatedMessages.length > MAX_RECENT_MESSAGES) {
       const oldestMessage = updatedMessages[0];
-      const text = typeof oldestMessage.content === 'string' 
-        ? oldestMessage.content 
-        : JSON.stringify(oldestMessage.content);
-      
-      updatedSummary = await this.summarize(updatedSummary, oldestMessage.role, text);
-      finalRecentMessages = updatedMessages.slice(1);
+      if (oldestMessage) {
+        const text = typeof oldestMessage.content === 'string' 
+          ? oldestMessage.content 
+          : JSON.stringify(oldestMessage.content);
+        
+        updatedSummary = await this.summarize(updatedSummary, oldestMessage.role, text);
+        finalRecentMessages = updatedMessages.slice(1);
+      }
     }
 
     await prisma.wa_session.upsert({
