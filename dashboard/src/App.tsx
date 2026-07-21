@@ -4,6 +4,7 @@ import ProtectedRoute from './lib/ProtectedRoute';
 import Landing from './pages/Landing';
 import Onboard from './pages/Onboard';
 import Dashboard from './pages/Dashboard';
+import Insights from './pages/Insights';
 import Products from './pages/Products';
 import Orders from './pages/Orders';
 import Conversations from './pages/Conversations';
@@ -26,6 +27,7 @@ export default function App() {
 
           <Route path="/onboard" element={<ProtectedRoute><Onboard /></ProtectedRoute>} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/insights" element={<ProtectedRoute><Insights /></ProtectedRoute>} />
           <Route path="/products" element={<ProtectedRoute><Products /></ProtectedRoute>} />
           <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
           <Route path="/conversations" element={<ProtectedRoute><Conversations /></ProtectedRoute>} />
