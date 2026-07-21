@@ -452,32 +452,36 @@ const start = async () => {
     let id: bigint;
     try { id = BigInt(request.params.id); }
     catch { return reply.status(400).send({ error: 'Invalid vendor ID' }); }
-    const sessions = await prisma.wa_session.findMany({
-      where: {
-        customer: { vendorId: id }
-      },
-      include: {
-        customer: true
-      },
-      orderBy: {
-        updatedAt: 'desc'
-      }
+
+    // First search for customers registered for this vendor ID
+    let customers = await prisma.customer.findMany({
+      where: { vendorId: id },
+      include: { sessions: true },
+      orderBy: { updatedAt: 'desc' }
     });
 
+    // If no customers found for this vendorId, fallback to fetching all customers in the database
+    if (customers.length === 0) {
+      customers = await prisma.customer.findMany({
+        include: { sessions: true },
+        orderBy: { updatedAt: 'desc' }
+      });
+    }
+
     const conversations = [];
-    for (const s of sessions) {
-      const ctx = s.context as any;
+    for (const c of customers) {
+      const ctx = c.sessions?.context as any;
       const messages = ctx?.recentMessages || [];
       const lastMsg = messages[messages.length - 1];
-      const snippet = lastMsg ? (typeof lastMsg.content === 'string' ? lastMsg.content : JSON.stringify(lastMsg.content)) : '';
-      const handoffActive = await redisConnection.get(`handoff:${s.customerId}`);
+      const snippet = lastMsg ? (typeof lastMsg.content === 'string' ? lastMsg.content : JSON.stringify(lastMsg.content)) : 'No messages yet';
+      const handoffActive = await redisConnection.get(`handoff:${c.id}`);
 
       conversations.push({
-        id: s.customerId.toString(),
-        customer: s.customer.name || s.customer.phoneNumber,
-        phoneNumber: s.customer.phoneNumber,
+        id: c.id.toString(),
+        customer: c.name || c.phoneNumber,
+        phoneNumber: c.phoneNumber,
         lastMessage: snippet,
-        timestamp: s.updatedAt.toISOString(),
+        timestamp: c.updatedAt.toISOString(),
         status: handoffActive === '1' ? 'HANDED_OFF' : 'ACTIVE'
       });
     }
@@ -491,27 +495,27 @@ const start = async () => {
     try { customerId = BigInt(request.params.customerId); }
     catch { return reply.status(400).send({ error: 'Invalid customer ID' }); }
 
-    const session = await prisma.wa_session.findUnique({
-      where: { customerId },
-      include: { customer: true }
+    const customer = await prisma.customer.findUnique({
+      where: { id: customerId },
+      include: { sessions: true }
     });
-    if (!session) return reply.status(404).send({ error: 'Conversation not found' });
+    if (!customer) return reply.status(404).send({ error: 'Customer not found' });
 
-    const ctx = session.context as any;
+    const ctx = customer.sessions?.context as any;
     const messages = ctx?.recentMessages || [];
     const handoffActive = await redisConnection.get(`handoff:${customerId}`);
 
     return {
       customerId: customerId.toString(),
-      customer: session.customer.name || session.customer.phoneNumber,
-      phoneNumber: session.customer.phoneNumber,
+      customer: customer.name || customer.phoneNumber,
+      phoneNumber: customer.phoneNumber,
       summary: ctx?.summary || '',
       status: handoffActive === '1' ? 'HANDED_OFF' : 'ACTIVE',
       messages: messages.map((m: any, idx: number) => ({
         id: idx.toString(),
         role: m.role,
         content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content),
-        timestamp: session.updatedAt.toISOString()
+        timestamp: customer.updatedAt.toISOString()
       }))
     };
   });
@@ -532,8 +536,8 @@ const start = async () => {
     return { status: handoff ? 'HANDED_OFF' : 'ACTIVE' };
   });
 
-  // ── Send Manual Message ───────────────────────────────────────────
-  fastify.post<{ Params: { id: string, customerId: string }; Body: { content: string } }>('/vendors/:id/conversations/:customerId/messages', async (request, reply) => {
+  // ── Send Manual Message (Supports both /messages and /message, and both content and text payload) ────
+  const sendManualMessageHandler = async (request: any, reply: any) => {
     let customerId: bigint;
     let vendorId: bigint;
     try {
@@ -542,8 +546,9 @@ const start = async () => {
     } catch {
       return reply.status(400).send({ error: 'Invalid customer or vendor ID' });
     }
-    const { content } = request.body;
-    if (!content?.trim()) {
+    const body = request.body || {};
+    const content = (body.content || body.text || '').toString().trim();
+    if (!content) {
       return reply.status(400).send({ error: 'Message content is required' });
     }
 
@@ -554,19 +559,25 @@ const start = async () => {
       return reply.status(404).send({ error: 'Customer not found' });
     }
 
+    // Determine target vendorId: use customer's vendorId if available, else route to request vendorId
+    const targetVendorId = customer.vendorId ? customer.vendorId.toString() : vendorId.toString();
+
     await outboundQueue.add(`reply:manual:${Date.now()}`, {
-      vendorId: vendorId.toString(),
+      vendorId: targetVendorId,
       remoteJid: `${customer.phoneNumber}@s.whatsapp.net`,
-      content: content.trim()
+      content
     });
 
     await ContextService.updateContext(customerId, {
       role: 'assistant',
-      content: content.trim()
+      content
     });
 
     return { success: true };
-  });
+  };
+
+  fastify.post('/vendors/:id/conversations/:customerId/messages', sendManualMessageHandler);
+  fastify.post('/vendors/:id/conversations/:customerId/message', sendManualMessageHandler);
 
   // ── Add Product ───────────────────────────────────────────────────
   fastify.post<{ Params: { id: string }; Body: { name: string; price: number; description?: string; stock: number } }>('/vendors/:id/products', async (request, reply) => {
