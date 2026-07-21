@@ -171,8 +171,8 @@ async function startSock(vendorId: string) {
           vendorId, customerPhone, customerName, messageId,
           type: 'location',
           location: {
-            lat: msg.message.locationMessage.degreesLatitude!,
-            lng: msg.message.locationMessage.degreesLongitude!
+            lat: msg.message.locationMessage.degreesLatitude ?? 0,
+            lng: msg.message.locationMessage.degreesLongitude ?? 0
           },
           timestamp: ts
         };

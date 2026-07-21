@@ -18,7 +18,7 @@ export interface EmbedProductJob {
 }
 
 const defaultOptions = {
-  connection: redisConnection,
+  connection: redisConnection as any,
   defaultJobOptions: {
     attempts: 3,
     backoff: {

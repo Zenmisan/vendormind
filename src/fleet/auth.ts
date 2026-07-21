@@ -1,7 +1,7 @@
 import { 
-  AuthenticationState, 
-  AuthenticationCreds, 
-  SignalDataTypeMap, 
+  type AuthenticationState, 
+  type AuthenticationCreds, 
+  type SignalDataTypeMap, 
   initAuthCreds, 
   BufferJSON, 
   proto 

@@ -1,5 +1,5 @@
 import { Worker } from 'bullmq';
-import { INBOUND_QUEUE, InboundMessageJob, outboundQueue } from '../shared/queue';
+import { INBOUND_QUEUE, type InboundMessageJob, outboundQueue } from '../shared/queue';
 import { redisConnection } from '../shared/redis';
 import { prisma } from '../shared/prisma/client';
 import { ContextService } from '../shared/context.service';
@@ -159,7 +159,7 @@ const worker = new Worker<InboundMessageJob>(
       throw error;
     }
   },
-  { connection: redisConnection }
+  { connection: redisConnection as any }
 );
 
 console.log('👷 Inbound Processor started');
