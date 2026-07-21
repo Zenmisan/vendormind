@@ -157,7 +157,7 @@ async function startSock(vendorId: string) {
       // Only handle personal DMs — skip groups, broadcasts, status, newsletters
       if (!remoteJid.endsWith('@s.whatsapp.net')) continue;
 
-      const customerPhone = remoteJid.split('@')[0];
+      const customerPhone = (remoteJid.split('@')[0] || '').replace(/\D/g, '');
       const customerName = msg.pushName?.trim() || undefined;
       const messageId = msg.key.id || '';
       const ts = Number(msg.messageTimestamp) || Date.now();
