@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
-  LayoutDashboard, LogOut, Package, PlugZap, Settings,
+  LayoutDashboard, LogOut, Package, PlugZap, Settings, Sparkles,
   ShoppingBag, Wallet, MessageSquare, Sun, Moon
 } from 'lucide-react';
 import { signOut } from 'firebase/auth';
@@ -9,6 +9,7 @@ import { auth } from '../lib/firebase';
 
 const nav = [
   { to: '/dashboard', label: 'Overview', Icon: LayoutDashboard },
+  { to: '/insights', label: 'Insights', Icon: Sparkles },
   { to: '/products',  label: 'Catalog',  Icon: Package },
   { to: '/orders',    label: 'Orders',   Icon: ShoppingBag },
   { to: '/conversations', label: 'Conversations', Icon: MessageSquare },

@@ -9,6 +9,7 @@ import { inboundQueue, outboundQueue, embedQueue, type EmbedProductJob } from '.
 import { MonnifyService } from '../shared/monnify.service';
 import { redisConnection } from '../shared/redis';
 import { ContextService } from '../shared/context.service';
+import { BusinessInsightsService } from '../shared/insights.service';
 
 const fastify = Fastify({
   logger: {
@@ -739,6 +740,34 @@ const start = async () => {
         agentGreeting: vendor.agentGreeting
       }
     };
+  });
+
+  // ── AI Business Insights ─────────────────────────────────────────
+  fastify.get<{ Params: { id: string }; Querystring: { period?: '7d' | '30d' } }>('/vendors/:id/insights', async (request, reply) => {
+    let id: bigint;
+    try { id = BigInt(request.params.id); }
+    catch { return reply.status(400).send({ error: 'Invalid vendor ID' }); }
+
+    const period = request.query.period === '30d' ? '30d' : '7d';
+    const vendor = await prisma.vendor.findUnique({ where: { id }, select: { id: true } });
+    if (!vendor) return reply.status(404).send({ error: 'Vendor not found' });
+
+    return BusinessInsightsService.build(id, period);
+  });
+
+  fastify.post<{ Params: { id: string }; Body: { period?: '7d' | '30d'; question?: string } }>('/vendors/:id/insights', async (request, reply) => {
+    let id: bigint;
+    try { id = BigInt(request.params.id); }
+    catch { return reply.status(400).send({ error: 'Invalid vendor ID' }); }
+
+    const period = request.body.period === '30d' ? '30d' : '7d';
+    const question = request.body.question?.trim();
+    if (!question) return reply.status(400).send({ error: 'Question is required' });
+
+    const vendor = await prisma.vendor.findUnique({ where: { id }, select: { id: true } });
+    if (!vendor) return reply.status(404).send({ error: 'Vendor not found' });
+
+    return BusinessInsightsService.ask(id, period, question);
   });
 
   // ── Monnify Webhook ────────────────────────────────────────────────
