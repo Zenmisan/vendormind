@@ -126,7 +126,7 @@ export class AIService {
       const text = this.mapContentToText(m.content);
       
       const last = history[history.length - 1];
-      if (last && last.role === role) {
+      if (last && last.role === role && last.parts[0]) {
         last.parts[0].text += '\n' + text;
       } else {
         history.push({ role, parts: [{ text }] });
@@ -152,7 +152,8 @@ export class AIService {
     const result = await model.generateContent({ contents });
     const response = result.response;
     
-    const parts = response.candidates?.[0].content.parts || [];
+    const candidates = response.candidates || [];
+    const parts = candidates[0]?.content?.parts || [];
     const textPart = parts.find(p => p.text);
     const toolParts = parts.filter(p => p.functionCall);
     
@@ -186,14 +187,14 @@ export class AIService {
         max_tokens: 2048,
       } as any);
 
-      const msg = response.choices[0].message;
-      const toolCalls = msg.tool_calls?.map(tc => ({
+      const msg = response.choices[0]?.message;
+      const toolCalls = msg?.tool_calls?.map(tc => ({
         id: tc.id,
         name: tc.function.name,
         input: JSON.parse(tc.function.arguments)
       }));
 
-      return { content: msg.content || '', toolCalls: toolCalls?.length ? toolCalls : undefined };
+      return { content: msg?.content || '', toolCalls: toolCalls?.length ? toolCalls : undefined };
     } catch (toolErr: any) {
       // Tool calling failed — retry with fast model or plain text
       console.warn('⚠️ Groq tool calling failed, retrying with llama-3.1-8b-instant...');
@@ -202,7 +203,7 @@ export class AIService {
         messages: groqMessages,
         max_tokens: 1024,
       } as any);
-      const text = fallback.choices[0].message.content || '';
+      const text = fallback.choices[0]?.message?.content || '';
       return { content: text };
     }
   }

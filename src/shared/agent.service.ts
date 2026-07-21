@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { SessionContext } from './context.service';
+import type { SessionContext } from './context.service';
 import { prisma } from './prisma/client';
 import { AIService } from './ai.service';
 import { MonnifyService } from './monnify.service';
