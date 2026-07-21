@@ -204,7 +204,7 @@ export default function WhatsAppConnectModal({ vendorId, onConnected, onClose }:
                 ) : pairingCode ? (
                   <div style={{ textAlign: 'center', padding: '1rem', background: 'var(--brand-dim)', borderRadius: 10, border: '1px solid rgba(22,163,74,0.2)' }}>
                     <p style={{ fontSize: '0.7rem', color: 'var(--brand)', fontWeight: 700, margin: '0 0 0.4rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Pairing code</p>
-                    <p style={{ fontFamily: 'var(--mono)', fontSize: '1.9rem', fontWeight 800, letterSpacing: '0.15em', color: 'var(--text)', margin: 0 }}>
+                    <p style={{ fontFamily: 'var(--mono)', fontSize: '1.9rem', fontWeight: 800, letterSpacing: '0.15em', color: 'var(--text)', margin: 0 }}>
                       {pairingCode.slice(0, 4)}-{pairingCode.slice(4)}
                     </p>
                     <p style={{ fontSize: '0.71rem', color: 'var(--text-3)', margin: '0.65rem 0 0' }}>
