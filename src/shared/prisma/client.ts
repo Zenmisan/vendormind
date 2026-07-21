@@ -9,15 +9,15 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-const dbUrl = process.env.DIRECT_URL || process.env.DATABASE_URL || '';
+const dbUrl = process.env.DATABASE_URL || process.env.DIRECT_URL || '';
 const isLocal = dbUrl.includes('localhost') || dbUrl.includes('127.0.0.1');
 
 const pool = new pg.Pool({
   connectionString: dbUrl,
   ssl: isLocal ? false : { rejectUnauthorized: false },
-  max: 10,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 30000,
+  max: 3,
+  idleTimeoutMillis: 10000,
+  connectionTimeoutMillis: 15000,
 });
 const adapter = new PrismaPg(pool);
 

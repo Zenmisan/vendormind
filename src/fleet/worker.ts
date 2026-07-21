@@ -129,7 +129,7 @@ async function startSock(vendorId: string) {
 
       if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
         console.log(`[Vendor ${vendorId}] Logged out — clearing session`);
-        await prisma.whatsAppSession.deleteMany({ where: { vendorId: vId } });
+        await prisma.whatsAppSession.deleteMany({ where: { vendorId: vId } }).catch(() => {});
       } else if (statusCode !== 440) {
         reconnectCount++;
         const delay = reconnectCount === 1 ? 1000 : Math.min(2000 * (2 ** Math.min(reconnectCount, 4)), 30000);
@@ -142,7 +142,7 @@ async function startSock(vendorId: string) {
         where: { sessionId: `${vendorId}:qr` },
         update: { data: { connected: true }, updatedAt: new Date() },
         create: { vendorId: vId, sessionId: `${vendorId}:qr`, data: { connected: true } },
-      });
+      }).catch(() => {});
     }
   });
 
