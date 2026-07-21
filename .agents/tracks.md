@@ -2,7 +2,7 @@
 
 ## Active Tracks
 
-*(none)*
+- [monnify-advanced-features](tracks/monnify_advanced_features_20260721/) — Advanced Monnify Features: Plan implementation of Customer Reserved Account bank transfers, automated refunds, and payment splitting.
 
 ## Completed Tracks
 

@@ -426,6 +426,8 @@ const start = async () => {
     if (data.connected) return { status: 'connected' };
     if (data.pairingCode) return { status: 'ready', code: data.pairingCode };
     return { status: 'waiting' };
+  });
+
   // ── WhatsApp Status Check (Persistent across devices) ──────────────
   fastify.get<{ Params: { id: string } }>('/vendors/:id/whatsapp/status', async (request) => {
     const vendorId = BigInt(request.params.id);
