@@ -41,9 +41,8 @@ function getAvatar(phone: string): string {
   return phone.slice(0, 2).toUpperCase();
 }
 
-function maskPhone(phone: string): string {
-  if (phone.length < 7) return phone;
-  return phone.replace(/(\+?\d{3}\s?\d{2})\d{3}(\d{4})/, '$1•••$2');
+function formatPhone(phone: string): string {
+  return phone || '—';
 }
 
 function fmtTime(ts: string): string {
@@ -187,7 +186,7 @@ export default function Conversations() {
     <div className="app-shell conv-shell" style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)' }}>
       <Sidebar active="conversations" />
 
-      <main className="app-main" style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100vh', padding: 0, overflow: 'hidden' }}>
+      <main className="app-main conv-main" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, padding: 0, overflow: 'hidden' }}>
         {/* ── Header ── */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -304,7 +303,7 @@ export default function Conversations() {
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.15rem' }}>
-                            <span style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text)' }}>{maskPhone(c.customer)}</span>
+                            <span style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text)' }}>{formatPhone(c.customer)}</span>
                             <span className="mono" style={{ fontSize: '0.7rem', color: 'var(--text-3)', flexShrink: 0, marginLeft: '0.5rem' }}>{fmtTime(c.timestamp)}</span>
                           </div>
                           <p style={{ margin: '0 0 0.3rem', fontSize: '0.76rem', color: 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -364,7 +363,7 @@ export default function Conversations() {
                       </div>
                       <div style={{ minWidth: 0 }}>
                         <h3 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {maskPhone(detail.phoneNumber || detail.customer)}
+                          {formatPhone(detail.phoneNumber || detail.customer)}
                         </h3>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.1rem' }}>
                           <div style={{ width: 6, height: 6, borderRadius: '50%', background: isHandoff ? '#f59e0b' : '#22c55e', flexShrink: 0 }} />
@@ -525,7 +524,7 @@ export default function Conversations() {
                       <div style={{ display: 'grid', gap: '0.45rem', fontSize: '0.76rem' }}>
                         {[
                           ['Status', isHandoff ? 'Handed Off' : 'AI Active', isHandoff ? '#f59e0b' : 'var(--brand)'],
-                          ['Phone', maskPhone(detail.phoneNumber), 'var(--text)'],
+                          ['Phone', formatPhone(detail.phoneNumber), 'var(--text)'],
                           ['Messages', String(detail.messages.length), 'var(--text)'],
                         ].map(([label, value, color]) => (
                           <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.35rem', borderBottom: '1px solid var(--border-subtle)' }}>

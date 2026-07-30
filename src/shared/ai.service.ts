@@ -31,10 +31,10 @@ export class AIService {
     tools: any[]
   ): Promise<AIProviderResponse> {
     const chain = [
-      { name: 'AgentRouter (Primary)', keyName: 'AgentRouter', fn: () => this.callAgentRouter(systemPrompt, messages, tools) },
-      { name: 'Groq (Backup)', keyName: 'Groq', fn: () => this.callGroq(systemPrompt, messages, tools) },
-      { name: 'Gemini (Secondary)', keyName: 'Gemini', fn: () => this.callGemini(systemPrompt, messages, tools) },
-      { name: 'Claude (Fallback)', keyName: 'Claude', fn: () => this.callClaude(systemPrompt, messages, tools) }
+      { name: 'Groq (Primary)', keyName: 'Groq', fn: () => this.callGroq(systemPrompt, messages, tools) },
+      { name: 'AgentRouter', keyName: 'AgentRouter', fn: () => this.callAgentRouter(systemPrompt, messages, tools) },
+      { name: 'Gemini', keyName: 'Gemini', fn: () => this.callGemini(systemPrompt, messages, tools) },
+      { name: 'Claude', keyName: 'Claude', fn: () => this.callClaude(systemPrompt, messages, tools) }
     ];
 
     for (const provider of chain) {
