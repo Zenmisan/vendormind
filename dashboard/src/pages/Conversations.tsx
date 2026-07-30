@@ -34,15 +34,24 @@ interface ConversationDetail {
   messages: Message[];
 }
 
-function getAvatar(phone: string): string {
-  const digits = phone.replace(/\D/g, '');
-  if (digits.length >= 4) return digits.slice(-4, -2);
-  if (digits.length >= 2) return digits.slice(-2);
-  return phone.slice(0, 2).toUpperCase();
+function getAvatar(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length >= 2) return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+  if (words.length === 1 && words[0].length >= 2) return words[0].slice(0, 2).toUpperCase();
+  return '??';
 }
 
-function formatPhone(phone: string): string {
-  return phone || '—';
+function formatPhone(raw: string): string {
+  if (!raw) return '—';
+  const digits = raw.replace(/\D/g, '');
+  if (!digits) return raw;
+  // Nigerian +234XXXXXXXXXX (13 digits)
+  if (digits.startsWith('234') && digits.length === 13)
+    return `+${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6, 10)} ${digits.slice(10)}`;
+  // Standard international ≤15 digits
+  if (digits.length <= 15) return '+' + digits;
+  // WhatsApp internal ID — space every 4 digits for readability
+  return digits.replace(/(\d{4})(?=\d)/g, '$1 ');
 }
 
 function fmtTime(ts: string): string {
@@ -302,11 +311,14 @@ export default function Conversations() {
                           {getAvatar(c.customer)}
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.15rem' }}>
-                            <span style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text)' }}>{formatPhone(c.customer)}</span>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.05rem' }}>
+                            <span style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.customer}</span>
                             <span className="mono" style={{ fontSize: '0.7rem', color: 'var(--text-3)', flexShrink: 0, marginLeft: '0.5rem' }}>{fmtTime(c.timestamp)}</span>
                           </div>
-                          <p style={{ margin: '0 0 0.3rem', fontSize: '0.76rem', color: 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <p style={{ margin: '0 0 0.18rem', fontSize: '0.7rem', color: 'var(--text-3)', fontFamily: 'var(--font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {formatPhone(c.phoneNumber || c.customer)}
+                          </p>
+                          <p style={{ margin: '0 0 0.28rem', fontSize: '0.75rem', color: 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {c.lastMessage || 'No messages yet'}
                           </p>
                           <span style={{
@@ -363,12 +375,14 @@ export default function Conversations() {
                       </div>
                       <div style={{ minWidth: 0 }}>
                         <h3 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {formatPhone(detail.phoneNumber || detail.customer)}
+                          {detail.customer}
                         </h3>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.1rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.1rem' }}>
+                          <span className="mono" style={{ fontSize: '0.7rem', color: 'var(--text-3)' }}>{formatPhone(detail.phoneNumber)}</span>
+                          <span style={{ color: 'var(--border)', fontSize: '0.65rem' }}>·</span>
                           <div style={{ width: 6, height: 6, borderRadius: '50%', background: isHandoff ? '#f59e0b' : '#22c55e', flexShrink: 0 }} />
                           <span style={{ fontSize: '0.72rem', color: 'var(--text-3)' }}>
-                            {isHandoff ? 'Awaiting your reply' : 'AI is handling this chat'}
+                            {isHandoff ? 'Awaiting reply' : 'AI handling'}
                           </span>
                         </div>
                       </div>

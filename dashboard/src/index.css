@@ -365,6 +365,9 @@ body {
   padding: 0.5rem 0.75rem 0.25rem;
 }
 
+/* Mobile-only sidebar items hidden by default */
+.sidebar-mobile-only { display: none !important; }
+
 /* ── Stat cards ─────────────────────────────────────────────── */
 .stat-card {
   background: var(--surface);
@@ -907,6 +910,17 @@ body {
   .card-raised {
     padding: 1.25rem !important;
   }
+}
+
+/* ── Insights layout ────────────────────────────────────────── */
+@media (max-width: 1100px) {
+  .insights-bottom-grid { grid-template-columns: 1fr !important; }
+}
+@media (max-width: 860px) {
+  .insights-metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+@media (max-width: 500px) {
+  .insights-metrics-grid { grid-template-columns: 1fr !important; }
 }
 
 /* ── Conversations layout ───────────────────────────────────── */
