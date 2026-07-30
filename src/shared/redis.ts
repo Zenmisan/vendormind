@@ -1,0 +1,11 @@
+import Redis from 'ioredis';
+import * as dotenv from 'dotenv';
+
+dotenv.config();
+
+const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+
+export const redisConnection = new Redis(REDIS_URL, {
+  maxRetriesPerRequest: null, // Required for BullMQ
+  tls: REDIS_URL.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined,
+});

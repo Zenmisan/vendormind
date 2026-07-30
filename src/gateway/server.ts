@@ -1,0 +1,1193 @@
+import Fastify from 'fastify';
+import helmet from '@fastify/helmet';
+import cors from '@fastify/cors';
+import compress from '@fastify/compress';
+import multipart from '@fastify/multipart';
+import * as XLSX from 'xlsx';
+import { prisma } from '../shared/prisma/client';
+import { inboundQueue, outboundQueue, embedQueue, type EmbedProductJob } from '../shared/queue';
+import { MonnifyService } from '../shared/monnify.service';
+import { BmoniService } from '../shared/bmoni.service';
+import { redisConnection } from '../shared/redis';
+import { ContextService } from '../shared/context.service';
+import { BusinessInsightsService } from '../shared/insights.service';
+import { AIService } from '../shared/ai.service';
+import { AdvisorService } from '../shared/advisor.service';
+
+const fastify = Fastify({
+  logger: {
+    level: process.env.LOG_LEVEL || 'info',
+    transport: { target: 'pino-pretty', options: { colorize: true } }
+  }
+});
+
+const start = async () => {
+  await fastify.register(helmet);
+  await fastify.register(cors, { origin: true });
+  await fastify.register(compress);
+  await fastify.register(multipart);
+
+  // ── Health ────────────────────────────────────────────────────────
+  fastify.get('/', async () => ({ name: 'VendorMind API Gateway', status: 'ok', timestamp: new Date().toISOString() }));
+  fastify.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }));
+
+  // ── Ops Dashboard ─────────────────────────────────────────────────
+  fastify.get('/ops/dashboard', async () => {
+    const [inboundCounts, outboundCounts, activeConversations, lowBalanceVendors] = await Promise.all([
+      inboundQueue.getJobCounts('waiting', 'active', 'completed', 'failed'),
+      outboundQueue.getJobCounts('waiting', 'active', 'completed', 'failed'),
+      prisma.wa_session.count({
+        where: { updatedAt: { gte: new Date(Date.now() - 5 * 60 * 1000) } }
+      }),
+      prisma.vendor.findMany({
+        where: { walletBalance: { lt: 2 } },
+        select: { id: true, name: true, email: true, walletBalance: true }
+      })
+    ]);
+
+    return {
+      timestamp: new Date().toISOString(),
+      queues: { inbound: inboundCounts, outbound: outboundCounts },
+      activeConversations,
+      lowBalanceVendors: lowBalanceVendors.map(v => ({
+        id: v.id.toString(),
+        name: v.name,
+        email: v.email,
+        balance: Number(v.walletBalance)
+      }))
+    };
+  });
+
+  // ── Demo Chat Easter Egg Agent ──────────────────────────────────────
+  fastify.post<{ Body: { messages: Array<{ role: 'user' | 'assistant'; content: string }> } }>('/api/demo-chat', async (request, reply) => {
+    const { messages } = request.body || {};
+    if (!messages || !Array.isArray(messages)) {
+      return reply.status(400).send({ error: 'Missing or invalid messages array' });
+    }
+
+    const systemPrompt = `You are Zinc, a friendly AI sales agent for VendorMind.
+VendorMind is a platform that gives African vendors an AI sales agent on WhatsApp.
+Vendors upload their products, scan a QR code, and their AI agent goes live instantly.
+Pricing is credit-based: ₦2,000 starter, ₦5,000 growth, ₦10,000 scale.
+Answer questions about VendorMind naturally, warmly, and helpfully.
+Keep replies under 3 sentences. Be warm, direct, and Nigerian-market-aware.
+Never say you are Claude, OpenAI, or an AI model. You are Zinc, VendorMind's sales assistant.`;
+
+    try {
+      const response = await AIService.generateResponse(systemPrompt, messages, []);
+      return { reply: response.content || "Hi there! I'm Zinc from VendorMind. How can I help you scale your sales today?" };
+    } catch (err: any) {
+      console.error("Demo chat error:", err.message);
+      return { reply: "Hi! I'm Zinc. VendorMind helps you automate WhatsApp sales completely. Try asking me about our pricing or setup time!" };
+    }
+  });
+
+  // ── Vendor Registration ───────────────────────────────────────────
+  fastify.post<{ Body: { name: string; email: string } }>('/vendors/register', async (request) => {
+    const { name, email } = request.body;
+    const existing = await prisma.vendor.findUnique({ where: { email } });
+    if (existing) {
+      return { vendorId: existing.id.toString(), message: 'Welcome back!' };
+    }
+    const vendor = await prisma.vendor.create({
+      data: { name, email, walletBalance: 10.0 }
+    });
+    return { vendorId: vendor.id.toString(), message: 'Vendor registered. Free ₦10 credit applied.' };
+  });
+
+  // ── Catalog Ingestion ─────────────────────────────────────────────
+  fastify.post<{ Params: { id: string } }>('/vendors/:id/catalog', async (request, reply) => {
+    const data = await request.file();
+    if (!data) return reply.status(400).send({ error: 'No file uploaded' });
+
+    const buffer = await data.toBuffer();
+    const workbook = XLSX.read(buffer, { type: 'buffer' });
+    const firstSheetName = workbook.SheetNames[0] || '';
+    const sheet = workbook.Sheets[firstSheetName];
+    const items: any[] = sheet ? XLSX.utils.sheet_to_json(sheet) : [];
+    const vendorId = BigInt(request.params.id);
+
+    if (items.length === 0) return reply.status(400).send({ error: 'Spreadsheet is empty' });
+
+    // Fuzzy column resolver — case-insensitive partial match
+    const keys = Object.keys(items[0]);
+    const find = (patterns: string[]) =>
+      keys.find(k => patterns.some(p => k.toLowerCase().includes(p))) ?? null;
+
+    const nameCol  = find(['name', 'product', 'item', 'title', 'cake', 'food', 'menu', 'service']);
+    const priceCol = find(['price', 'cost', 'amount', 'fee', 'rate', 'naira', 'charge']);
+    const descCol  = find(['desc', 'detail', 'note', 'about', 'whatnot', 'flavor', 'flavour', 'info', 'ingred', 'spec']);
+    const stockCol = find(['stock', 'qty', 'quantity', 'inventory', 'count', 'avail', 'units']);
+
+    // Columns not mapped to name/price/stock get concatenated into description
+    const usedCols = new Set([nameCol, priceCol, stockCol].filter(Boolean));
+    const extraDescCols = keys.filter(k => !usedCols.has(k) && k !== '#' && k !== 'id');
+
+    const creations = items
+      .map(item => {
+        const name = nameCol ? String(item[nameCol] ?? '').trim() : '';
+        if (!name) return null;
+
+        const explicitDesc = descCol ? String(item[descCol] ?? '').trim() : '';
+        const extraDesc = extraDescCols
+          .map(k => item[k] ? String(item[k]).trim() : '')
+          .filter(Boolean)
+          .join(' · ');
+        const description = [explicitDesc, !descCol && extraDesc ? extraDesc : '']
+          .filter(Boolean).join(' — ') || extraDesc || null;
+
+        return {
+          vendorId,
+          name,
+          price: priceCol ? Number(item[priceCol]) || 0 : 0,
+          description: description || null,
+          stock: stockCol ? Number(item[stockCol]) || 0 : 0,
+        };
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null);
+
+    if (creations.length === 0)
+      return reply.status(400).send({ error: `No valid rows found. Detected columns: ${keys.join(', ')}. Need at least a name/product column.` });
+
+    await prisma.product.createMany({ data: creations, skipDuplicates: true });
+
+    // Enqueue embeddings for all ingested products
+    const inserted = await prisma.product.findMany({
+      where: { vendorId, name: { in: creations.map(c => c.name) } },
+      select: { id: true, name: true, description: true }
+    });
+
+    for (const p of inserted) {
+      const text = [p.name, p.description].filter(Boolean).join(' — ');
+      await embedQueue.add(`embed:${p.id}_${Date.now()}`, {
+        productId: p.id.toString(),
+        text
+      }).catch(err => {
+        console.warn(`Embed queue warning for catalog item ${p.id}:`, err.message);
+      });
+    }
+
+    return { count: creations.length, message: 'Catalog ingested. Embedding jobs queued.' };
+  });
+
+  // ── Wallet Top-up ─────────────────────────────────────────────────
+  // Legacy direct topup (dev/mock only — no Nomba credentials)
+  fastify.post<{ Body: { vendorId: string; amount: number } }>('/topup', async (request) => {
+    const { vendorId, amount } = request.body;
+    const vendor = await prisma.vendor.update({
+      where: { id: BigInt(vendorId) },
+      data: { walletBalance: { increment: amount } }
+    });
+    return { newBalance: Number(vendor.walletBalance) };
+  });
+
+  // ── Wallet Top-up via BMONI Smart Wallet ───────────────────────────
+  fastify.post<{ Params: { id: string }; Body: { amount: number } }>('/vendors/:id/wallet/topup', async (request, reply) => {
+    let vendorId: bigint;
+    try { vendorId = BigInt(request.params.id); }
+    catch { return reply.status(400).send({ error: 'Invalid vendor ID' }); }
+
+    const { amount } = request.body;
+    if (!amount || amount <= 0) return reply.status(400).send({ error: 'Invalid amount' });
+
+    const vendor = await prisma.vendor.findUnique({ where: { id: vendorId }, select: { name: true, email: true } });
+    if (!vendor) return reply.status(404).send({ error: 'Vendor not found' });
+
+    // Credit BMONI cNGN smart wallet balance directly
+    const updated = await prisma.vendor.update({
+      where: { id: vendorId },
+      data: { walletBalance: { increment: amount } }
+    });
+
+    console.log(`💳 BMONI Wallet Top-up: Vendor #${vendorId} credited ₦${amount}. New balance: ₦${updated.walletBalance}`);
+
+    return {
+      mode: 'bmoni',
+      success: true,
+      message: `BMONI Smart Wallet credited ₦${amount.toLocaleString()} cNGN`,
+      newBalance: Number(updated.walletBalance)
+    };
+  });
+
+  // ── Catalog Embedding Progress ────────────────────────────────────
+  fastify.get<{ Params: { id: string } }>('/vendors/:id/catalog/progress', async (request, reply) => {
+    let vendorId: bigint;
+    try { vendorId = BigInt(request.params.id); }
+    catch { return reply.status(400).send({ error: 'Invalid vendor ID' }); }
+
+    const vendor = await prisma.vendor.findUnique({ where: { id: vendorId }, select: { id: true } });
+    if (!vendor) return reply.status(404).send({ error: 'Vendor not found' });
+
+    const total = await prisma.product.count({ where: { vendorId } });
+    const embeddedResult = await prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(*)::bigint as count
+      FROM products
+      WHERE "vendorId" = ${vendorId}
+        AND embedding IS NOT NULL
+    `;
+    const embedded = Number(embeddedResult[0]?.count || 0);
+    const progress = total > 0 ? Number(((embedded / total) * 100).toFixed(1)) : 100.0;
+    const allowed = progress >= 80.0;
+
+    return { total, embedded, progress, allowed };
+  });
+
+  // ── Products List ────────────────────────────────────────────
+  fastify.get<{
+    Params: { id: string };
+    Querystring: { page?: string; limit?: string; sortBy?: string; sortOrder?: string };
+  }>('/vendors/:id/products', async (request, reply) => {
+    let vendorId: bigint;
+    try { vendorId = BigInt(request.params.id); }
+    catch { return reply.status(400).send({ error: 'Invalid vendor ID' }); }
+
+    const vendor = await prisma.vendor.findUnique({ where: { id: vendorId }, select: { id: true } });
+    if (!vendor) return reply.status(404).send({ error: 'Vendor not found' });
+
+    const page  = Math.max(1, parseInt(request.query.page  || '1'));
+    const limit = Math.min(100, Math.max(1, parseInt(request.query.limit || '50')));
+    const skip  = (page - 1) * limit;
+
+    const allowedSort = ['name', 'price', 'stock', 'createdAt', 'updatedAt'];
+    const sortBy    = allowedSort.includes(request.query.sortBy || '') ? request.query.sortBy! : 'name';
+    const sortOrder = request.query.sortOrder === 'desc' ? 'desc' : 'asc';
+
+    const [products, total, embeddedIdsResult] = await Promise.all([
+      prisma.product.findMany({
+        where: { vendorId },
+        select: { id: true, name: true, description: true, price: true, stock: true, reservedStock: true, imageUrl: true, createdAt: true, updatedAt: true },
+        orderBy: { [sortBy]: sortOrder },
+        skip, take: limit,
+      }),
+      prisma.product.count({ where: { vendorId } }),
+      prisma.$queryRaw<Array<{ id: bigint }>>`
+        SELECT id FROM products WHERE "vendorId" = ${vendorId} AND embedding IS NOT NULL
+      `
+    ]);
+
+    const embeddedIds = new Set(embeddedIdsResult.map(r => r.id.toString()));
+
+    return {
+      products: products.map(p => ({
+        id: p.id.toString(),
+        name: p.name,
+        description: p.description,
+        price: p.price.toString(),
+        stock: p.stock,
+        reservedStock: p.reservedStock,
+        imageUrl: p.imageUrl,
+        isEmbedded: embeddedIds.has(p.id.toString()),
+        createdAt: p.createdAt.toISOString(),
+        updatedAt: p.updatedAt.toISOString(),
+      })),
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
+  });
+
+  // ── Orders List ──────────────────────────────────────────────
+  fastify.get<{
+    Params: { id: string };
+    Querystring: { page?: string; limit?: string; status?: string };
+  }>('/vendors/:id/orders', async (request, reply) => {
+    let vendorId: bigint;
+    try { vendorId = BigInt(request.params.id); }
+    catch { return reply.status(400).send({ error: 'Invalid vendor ID' }); }
+
+    const vendor = await prisma.vendor.findUnique({ where: { id: vendorId }, select: { id: true } });
+    if (!vendor) return reply.status(404).send({ error: 'Vendor not found' });
+
+    const page  = Math.max(1, parseInt(request.query.page  || '1'));
+    const limit = Math.min(100, Math.max(1, parseInt(request.query.limit || '50')));
+    const skip  = (page - 1) * limit;
+
+    const validStatuses = ['PENDING', 'PAID', 'CANCELED', 'DELIVERED'];
+    const statusParam = request.query.status?.toUpperCase();
+    if (statusParam && !validStatuses.includes(statusParam))
+      return reply.status(400).send({ error: 'Invalid status filter' });
+
+    const where = { vendorId, ...(statusParam ? { status: statusParam } : {}) };
+
+    const [orders, total] = await Promise.all([
+      prisma.order.findMany({
+        where,
+        select: {
+          id: true, total: true, status: true, createdAt: true, updatedAt: true,
+          customer: { select: { name: true, phoneNumber: true } },
+          items: { select: { quantity: true, price: true, product: { select: { name: true } } } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip, take: limit,
+      }),
+      prisma.order.count({ where }),
+    ]);
+
+    return {
+      orders: orders.map(o => ({
+        id: o.id.toString(),
+        customer: o.customer.name || o.customer.phoneNumber,
+        total: o.total.toString(),
+        status: o.status,
+        createdAt: o.createdAt.toISOString(),
+        updatedAt: o.updatedAt.toISOString(),
+        itemCount: o.items.length,
+        items: o.items.map(i => `${i.quantity}× ${i.product.name}`),
+      })),
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
+  });
+
+  // ── Update Order Status ───────────────────────────────────────────
+  fastify.put<{ Params: { id: string, orderId: string }; Body: { status: string } }>('/vendors/:id/orders/:orderId', async (request, reply) => {
+    let orderId: bigint;
+    try { orderId = BigInt(request.params.orderId); }
+    catch { return reply.status(400).send({ error: 'Invalid order ID' }); }
+    const { status } = request.body;
+
+    const order = await prisma.order.update({
+      where: { id: orderId },
+      data: { status }
+    });
+    return { order: { id: order.id.toString(), status: order.status } };
+  });
+
+  // ── Refund Order ──────────────────────────────────────────────────
+  fastify.post<{ Params: { id: string, orderId: string }; Body: { reason?: string } }>('/vendors/:id/orders/:orderId/refund', async (request, reply) => {
+    let orderId: bigint;
+    try { orderId = BigInt(request.params.orderId); }
+    catch { return reply.status(400).send({ error: 'Invalid order ID' }); }
+
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: { refunds: true }
+    });
+
+    if (!order) return reply.status(404).send({ error: 'Order not found' });
+    if (order.status !== 'PAID') {
+      return reply.status(400).send({ error: 'Only paid orders can be refunded' });
+    }
+
+    const refundReference = `REF-${orderId}-${Date.now()}`;
+    const amount = Number(order.total);
+
+    const refundResult = await MonnifyService.initiateRefund({
+      transactionReference: order.paymentLink || '',
+      refundReference,
+      amount,
+      refundReason: request.body.reason || 'Requested by vendor'
+    });
+
+    if (!refundResult) {
+      return reply.status(500).send({ error: 'Monnify refund initialization failed' });
+    }
+
+    const refund = await prisma.refund.create({
+      data: {
+        orderId,
+        amount,
+        status: refundResult.status,
+        monnifyRefundId: refundResult.refundId || null,
+        refundReference,
+        reason: request.body.reason || null
+      }
+    });
+
+    await prisma.order.update({
+      where: { id: orderId },
+      data: { status: 'REFUNDED' }
+    });
+
+    return { success: true, refund: { id: refund.id.toString(), status: refund.status } };
+  });
+
+  // ── BMONI Vendor Wallet Endpoints ────────────────────────────────
+  fastify.get<{ Params: { id: string } }>('/vendors/:id/bmoni/wallet', async (request, reply) => {
+    let vendorId: bigint;
+    try { vendorId = BigInt(request.params.id); }
+    catch { return reply.status(400).send({ error: 'Invalid vendor ID' }); }
+
+    const vendor = await prisma.vendor.findUnique({ where: { id: vendorId } });
+    if (!vendor) return reply.status(404).send({ error: 'Vendor not found' });
+
+    // Auto-provision if vendor doesn't have BMONI wallet yet
+    if (!vendor.bmoniUserId || !vendor.bmoniSmartWalletId) {
+      try {
+        const bmoniStack = await BmoniService.provisionUserStack(
+          vendor.name || `Vendor ${vendor.id}`,
+          vendor.email || `vendor${vendor.id}@vendormind.app`,
+          vendor.phoneNumber || `+234800000000${vendor.id}`
+        );
+
+        const updatedVendor = await prisma.vendor.update({
+          where: { id: vendorId },
+          data: {
+            bmoniUserId: bmoniStack.bmoniUserId,
+            bmoniSmartWalletId: bmoniStack.smartWalletId,
+            bmoniSmartWalletAddress: bmoniStack.smartWalletAddress,
+            bmoniNgnRailActive: true,
+            bmoniDepositAccountNumber: bmoniStack.depositAccountNumber,
+            bmoniDepositBankName: bmoniStack.depositBankName,
+          }
+        });
+
+        const balances = await BmoniService.getWalletBalances(bmoniStack.bmoniUserId);
+        return {
+          bmoniUserId: updatedVendor.bmoniUserId,
+          smartWalletId: updatedVendor.bmoniSmartWalletId,
+          smartWalletAddress: updatedVendor.bmoniSmartWalletAddress,
+          ngnRailActive: updatedVendor.bmoniNgnRailActive,
+          depositAccount: updatedVendor.bmoniDepositAccountNumber,
+          depositBank: updatedVendor.bmoniDepositBankName,
+          balances,
+        };
+      } catch (err: any) {
+        console.error("Failed to auto-provision vendor BMONI wallet:", err.message);
+      }
+    }
+
+    const balances = vendor.bmoniUserId
+      ? await BmoniService.getWalletBalances(vendor.bmoniUserId)
+      : [{ currency: "CNGN", balance: "0" }];
+
+    return {
+      bmoniUserId: vendor.bmoniUserId,
+      smartWalletId: vendor.bmoniSmartWalletId,
+      smartWalletAddress: vendor.bmoniSmartWalletAddress,
+      ngnRailActive: vendor.bmoniNgnRailActive,
+      depositAccount: vendor.bmoniDepositAccountNumber || "Pending",
+      depositBank: vendor.bmoniDepositBankName || "Wema Bank / BMONI",
+      balances,
+    };
+  });
+
+  fastify.post<{ Params: { id: string } }>('/vendors/:id/bmoni/provision', async (request, reply) => {
+    let vendorId: bigint;
+    try { vendorId = BigInt(request.params.id); }
+    catch { return reply.status(400).send({ error: 'Invalid vendor ID' }); }
+
+    const vendor = await prisma.vendor.findUnique({ where: { id: vendorId } });
+    if (!vendor) return reply.status(404).send({ error: 'Vendor not found' });
+
+    const bmoniStack = await BmoniService.provisionUserStack(
+      vendor.name || `Vendor ${vendor.id}`,
+      vendor.email || `vendor${vendor.id}@vendormind.app`,
+      vendor.phoneNumber || `+234800000000${vendor.id}`
+    );
+
+    const updatedVendor = await prisma.vendor.update({
+      where: { id: vendorId },
+      data: {
+        bmoniUserId: bmoniStack.bmoniUserId,
+        bmoniSmartWalletId: bmoniStack.smartWalletId,
+        bmoniSmartWalletAddress: bmoniStack.smartWalletAddress,
+        bmoniNgnRailActive: true,
+        bmoniDepositAccountNumber: bmoniStack.depositAccountNumber,
+        bmoniDepositBankName: bmoniStack.depositBankName,
+      }
+    });
+
+    return { success: true, wallet: updatedVendor };
+  });
+
+  fastify.post<{
+    Params: { id: string };
+    Body: { bankCode: string; accountNumber: string; amount: string };
+  }>('/vendors/:id/bmoni/withdraw', async (request, reply) => {
+    let vendorId: bigint;
+    try { vendorId = BigInt(request.params.id); }
+    catch { return reply.status(400).send({ error: 'Invalid vendor ID' }); }
+
+    const { bankCode, accountNumber, amount } = request.body;
+    if (!bankCode || !accountNumber || !amount) {
+      return reply.status(400).send({ error: 'Missing bankCode, accountNumber, or amount' });
+    }
+
+    const vendor = await prisma.vendor.findUnique({ where: { id: vendorId } });
+    if (!vendor || !vendor.bmoniUserId || !vendor.bmoniSmartWalletId) {
+      return reply.status(400).send({ error: 'Vendor BMONI wallet is not initialized' });
+    }
+
+    try {
+      const result = await BmoniService.withdrawToNigerianBank(
+        vendor.bmoniUserId,
+        vendor.bmoniSmartWalletId,
+        bankCode,
+        accountNumber,
+        amount
+      );
+      return { success: true, withdrawal: result };
+    } catch (err: any) {
+      console.error("Offramp withdrawal error:", err.message);
+      return reply.status(400).send({
+        error: `Offramp withdrawal failed: ${err.message}. Please check your 10-digit NUBAN account number and bank code.`
+      });
+    }
+  });
+
+  // Clear handoff flag for customer live chat
+  fastify.post<{
+    Params: { id: string; customerId: string };
+  }>('/vendors/:id/customers/:customerId/handoff/clear', async (request, reply) => {
+    const { customerId } = request.params;
+    const handoffKey = `handoff:${customerId}`;
+    await redisConnection.del(handoffKey);
+    return { success: true, message: `Handoff flag cleared for customer ${customerId}` };
+  });
+
+  // ── WhatsApp QR Proxy ─────────────────────────────────────────────────
+  fastify.get<{ Params: { id: string } }>('/vendors/:id/whatsapp/qr', async (request) => {
+    const vendorId = BigInt(request.params.id);
+
+    // Check if auth credentials session exists (connected state)
+    const credsSession = await prisma.whatsAppSession.findFirst({
+      where: { vendorId, sessionId: `${request.params.id}:creds` }
+    });
+    if (credsSession) {
+      const credsData = credsSession.data as any;
+      if (credsData?.me?.id || credsData?.registered) {
+        return { status: 'connected' };
+      }
+    }
+
+    const session = await prisma.whatsAppSession.findFirst({
+      where: { vendorId, sessionId: `${request.params.id}:qr` },
+      orderBy: { updatedAt: 'desc' }
+    });
+    if (!session) return { status: 'waiting' };
+    const sessionData = session.data as any;
+    if (sessionData.connected) return { status: 'connected' };
+    if (sessionData.qr) return { status: 'ready', qr: sessionData.qr };
+    return { status: 'waiting' };
+  });
+  // ── Pairing Code Request ──────────────────────────────────────────
+  fastify.post<{ Params: { id: string }; Body: { phone: string } }>('/vendors/:id/whatsapp/pair', async (request, reply) => {
+    let vendorId: bigint;
+    try { vendorId = BigInt(request.params.id); }
+    catch { return reply.status(400).send({ error: 'Invalid vendor ID' }); }
+
+    const { phone } = request.body;
+    if (!phone) return reply.status(400).send({ error: 'phone required' });
+
+    // Clear all existing sessions for this vendor so Baileys starts 100% unregistered
+    await prisma.whatsAppSession.deleteMany({ where: { vendorId } });
+
+    let formattedPhone = phone.replace(/\D/g, '');
+    if (formattedPhone.startsWith('0') && formattedPhone.length === 11) {
+      formattedPhone = '234' + formattedPhone.slice(1);
+    }
+
+    // Signal fleet worker to use pairing code on next QR event
+    await redisConnection.set(`pairing_phone:${request.params.id}`, formattedPhone, 'EX', 300);
+
+    // Notify fleet worker to restart socket for fresh pairing event
+    await redisConnection.publish('fleet_control', JSON.stringify({
+      action: 'restart_socket',
+      vendorId: request.params.id
+    }));
+
+    return { status: 'pending', message: 'Pairing code will be ready in ~5 seconds. Poll /whatsapp/pairing-code.' };
+  });
+
+  // ── Reset Session / Force Fresh QR ─────────────────────────────
+  fastify.post<{ Params: { id: string } }>('/vendors/:id/whatsapp/reset', async (request, reply) => {
+    let vendorId: bigint;
+    try { vendorId = BigInt(request.params.id); }
+    catch { return reply.status(400).send({ error: 'Invalid vendor ID' }); }
+
+    await prisma.whatsAppSession.deleteMany({
+      where: { vendorId, sessionId: { contains: request.params.id } }
+    });
+
+    await redisConnection.publish('fleet_control', JSON.stringify({
+      action: 'restart_socket',
+      vendorId: request.params.id
+    }));
+
+    return { status: 'reset', message: 'Session reset. Fleet worker re-initializing socket.' };
+  });
+
+  // ── Get Pairing Code ──────────────────────────────────────────────
+  fastify.get<{ Params: { id: string } }>('/vendors/:id/whatsapp/pairing-code', async (request) => {
+    const vendorId = BigInt(request.params.id);
+
+    // Check if auth credentials session exists (connected state)
+    const credsSession = await prisma.whatsAppSession.findFirst({
+      where: { vendorId, sessionId: `${request.params.id}:creds` }
+    });
+    if (credsSession) {
+      const credsData = credsSession.data as any;
+      if (credsData?.me?.id || credsData?.registered) {
+        return { status: 'connected' };
+      }
+    }
+
+    const session = await prisma.whatsAppSession.findFirst({
+      where: { vendorId, sessionId: `${request.params.id}:qr` },
+      orderBy: { updatedAt: 'desc' }
+    });
+    if (!session) return { status: 'waiting' };
+    const data = session.data as any;
+    if (data.connected) return { status: 'connected' };
+    if (data.pairingCode) return { status: 'ready', code: data.pairingCode };
+    return { status: 'waiting' };
+  });
+
+  // ── WhatsApp Status Check (Persistent across devices) ──────────────
+  fastify.get<{ Params: { id: string } }>('/vendors/:id/whatsapp/status', async (request) => {
+    const vendorId = BigInt(request.params.id);
+
+    const credsSession = await prisma.whatsAppSession.findFirst({
+      where: { vendorId, sessionId: `${request.params.id}:creds` }
+    });
+    if (credsSession) {
+      const credsData = credsSession.data as any;
+      if (credsData?.me?.id || credsData?.registered) {
+        return { connected: true, status: 'connected' };
+      }
+    }
+
+    const session = await prisma.whatsAppSession.findFirst({
+      where: { vendorId, sessionId: `${request.params.id}:qr` },
+      orderBy: { updatedAt: 'desc' }
+    });
+    if (!session) return { connected: false, status: 'disconnected' };
+    const data = session.data as any;
+    return { connected: !!data.connected, status: data.connected ? 'connected' : 'disconnected' };
+  });
+
+  // ── Wallet Details ────────────────────────────────────────────────
+  fastify.get<{ Params: { id: string } }>('/vendors/:id/wallet', async (request, reply) => {
+    let id: bigint;
+    try { id = BigInt(request.params.id); }
+    catch { return reply.status(400).send({ error: 'Invalid vendor ID' }); }
+    const vendor = await prisma.vendor.findUnique({
+      where: { id },
+      select: { walletBalance: true }
+    });
+    if (!vendor) return reply.status(404).send({ error: 'Vendor not found' });
+    return {
+      balance: Number(vendor.walletBalance),
+      currency: 'NGN',
+      transactions: [
+        { id: 'tx_1', description: 'Welcome Free Credit', amount: 10.0, type: 'credit', createdAt: new Date().toISOString() }
+      ]
+    };
+  });
+
+  // ── Conversations List ────────────────────────────────────────────
+  fastify.get<{ Params: { id: string } }>('/vendors/:id/conversations', async (request, reply) => {
+    let id: bigint;
+    try { id = BigInt(request.params.id); }
+    catch { return reply.status(400).send({ error: 'Invalid vendor ID' }); }
+
+    // First search for customers registered for this vendor ID
+    let customers = await prisma.customer.findMany({
+      where: { vendorId: id },
+      include: { sessions: true },
+      orderBy: { updatedAt: 'desc' }
+    });
+
+    // If no customers found for this vendorId, fallback to fetching all customers in the database
+    if (customers.length === 0) {
+      customers = await prisma.customer.findMany({
+        include: { sessions: true },
+        orderBy: { updatedAt: 'desc' }
+      });
+    }
+
+    const conversations = [];
+    for (const c of customers) {
+      const ctx = c.sessions?.context as any;
+      const messages = ctx?.recentMessages || [];
+      const lastMsg = messages[messages.length - 1];
+      const snippet = lastMsg ? (typeof lastMsg.content === 'string' ? lastMsg.content : JSON.stringify(lastMsg.content)) : 'No messages yet';
+      const handoffActive = await redisConnection.get(`handoff:${c.id}`);
+
+      conversations.push({
+        id: c.id.toString(),
+        customer: c.name || c.phoneNumber,
+        phoneNumber: c.phoneNumber,
+        lastMessage: snippet,
+        timestamp: c.updatedAt.toISOString(),
+        status: handoffActive === '1' ? 'HANDED_OFF' : 'ACTIVE'
+      });
+    }
+
+    return { conversations };
+  });
+
+  // ── Conversation Detail ───────────────────────────────────────────
+  fastify.get<{ Params: { id: string, customerId: string } }>('/vendors/:id/conversations/:customerId', async (request, reply) => {
+    let customerId: bigint;
+    try { customerId = BigInt(request.params.customerId); }
+    catch { return reply.status(400).send({ error: 'Invalid customer ID' }); }
+
+    const customer = await prisma.customer.findUnique({
+      where: { id: customerId },
+      include: { sessions: true }
+    });
+    if (!customer) return reply.status(404).send({ error: 'Customer not found' });
+
+    const ctx = customer.sessions?.context as any;
+    const messages = ctx?.recentMessages || [];
+    const handoffActive = await redisConnection.get(`handoff:${customerId}`);
+
+    return {
+      customerId: customerId.toString(),
+      customer: customer.name || customer.phoneNumber,
+      phoneNumber: customer.phoneNumber,
+      summary: ctx?.summary || '',
+      status: handoffActive === '1' ? 'HANDED_OFF' : 'ACTIVE',
+      messages: messages.map((m: any, idx: number) => ({
+        id: idx.toString(),
+        role: m.role,
+        content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content),
+        timestamp: customer.updatedAt.toISOString()
+      }))
+    };
+  });
+
+  // ── Handoff Toggle ────────────────────────────────────────────────
+  fastify.post<{ Params: { id: string, customerId: string }; Body: { handoff: boolean } }>('/vendors/:id/conversations/:customerId/handoff', async (request, reply) => {
+    let customerId: bigint;
+    try { customerId = BigInt(request.params.customerId); }
+    catch { return reply.status(400).send({ error: 'Invalid customer ID' }); }
+    const { handoff } = request.body;
+
+    const handoffKey = `handoff:${customerId}`;
+    if (handoff) {
+      await redisConnection.set(handoffKey, '1', 'EX', 3600);
+    } else {
+      await redisConnection.del(handoffKey);
+    }
+    return { status: handoff ? 'HANDED_OFF' : 'ACTIVE' };
+  });
+
+  // ── Send Manual Message (Supports both /messages and /message, and both content and text payload) ────
+  const sendManualMessageHandler = async (request: any, reply: any) => {
+    let customerId: bigint;
+    let vendorId: bigint;
+    try {
+      customerId = BigInt(request.params.customerId);
+      vendorId = BigInt(request.params.id);
+    } catch {
+      return reply.status(400).send({ error: 'Invalid customer or vendor ID' });
+    }
+    const body = request.body || {};
+    const content = (body.content || body.text || '').toString().trim();
+    if (!content) {
+      return reply.status(400).send({ error: 'Message content is required' });
+    }
+
+    const customer = await prisma.customer.findUnique({
+      where: { id: customerId }
+    });
+    if (!customer) {
+      return reply.status(404).send({ error: 'Customer not found' });
+    }
+
+    // Determine target vendorId: use customer's vendorId if available, else route to request vendorId
+    const targetVendorId = customer.vendorId ? customer.vendorId.toString() : vendorId.toString();
+
+    await outboundQueue.add(`reply:manual:${Date.now()}`, {
+      vendorId: targetVendorId,
+      remoteJid: `${customer.phoneNumber}@s.whatsapp.net`,
+      content
+    });
+
+    await ContextService.updateContext(customerId, {
+      role: 'assistant',
+      content
+    });
+
+    // Auto-clear handoff flag when merchant sends a manual message
+    await redisConnection.del(`handoff:${customerId}`);
+
+    return { success: true };
+  };
+
+  fastify.post('/vendors/:id/conversations/:customerId/messages', sendManualMessageHandler);
+  fastify.post('/vendors/:id/conversations/:customerId/message', sendManualMessageHandler);
+
+  // ── Add Product ───────────────────────────────────────────────────
+  fastify.post<{ Params: { id: string }; Body: { name: string; price: number; description?: string; stock: number; imageUrl?: string } }>('/vendors/:id/products', async (request, reply) => {
+    let id: bigint;
+    try { id = BigInt(request.params.id); }
+    catch { return reply.status(400).send({ error: 'Invalid vendor ID' }); }
+    const { name, price, description, stock, imageUrl } = request.body;
+
+    const product = await prisma.product.create({
+      data: {
+        vendorId: id,
+        name,
+        price: Number(price),
+        description: description || null,
+        stock: Number(stock),
+        imageUrl: imageUrl || null
+      }
+    });
+
+    const text = [product.name, product.description].filter(Boolean).join(' — ');
+    await embedQueue.add(`embed:${product.id}_${Date.now()}`, {
+      productId: product.id.toString(),
+      text
+    }).catch(err => {
+      console.warn(`Embed queue warning for product ${product.id}:`, err.message);
+    });
+
+    return {
+      product: {
+        id: product.id.toString(),
+        name: product.name,
+        description: product.description,
+        price: product.price.toString(),
+        stock: product.stock,
+        reservedStock: product.reservedStock,
+        imageUrl: product.imageUrl
+      }
+    };
+  });
+
+  // ── Update Product ────────────────────────────────────────────────
+  fastify.put<{ Params: { id: string, productId: string }; Body: { name?: string; price?: number; description?: string; stock?: number; imageUrl?: string } }>('/vendors/:id/products/:productId', async (request, reply) => {
+    let productId: bigint;
+    try { productId = BigInt(request.params.productId); }
+    catch { return reply.status(400).send({ error: 'Invalid product ID' }); }
+    const { name, price, description, stock, imageUrl } = request.body;
+
+    const updateData: any = {};
+    if (name !== undefined) updateData.name = name;
+    if (price !== undefined) updateData.price = Number(price);
+    if (description !== undefined) updateData.description = description || null;
+    if (stock !== undefined) updateData.stock = Number(stock);
+    if (imageUrl !== undefined) updateData.imageUrl = imageUrl || null;
+
+    const product = await prisma.product.update({
+      where: { id: productId },
+      data: updateData
+    });
+
+    if (name !== undefined || description !== undefined) {
+      const text = [product.name, product.description].filter(Boolean).join(' — ');
+      await embedQueue.add(`embed:${product.id}_${Date.now()}`, {
+        productId: product.id.toString(),
+        text
+      }).catch(err => {
+        console.warn(`Embed queue warning for updated product ${product.id}:`, err.message);
+      });
+    }
+
+    return {
+      product: {
+        id: product.id.toString(),
+        name: product.name,
+        description: product.description,
+        price: product.price.toString(),
+        stock: product.stock,
+        reservedStock: product.reservedStock,
+        imageUrl: product.imageUrl
+      }
+    };
+  });
+
+  // ── Delete Product ────────────────────────────────────────────────
+  fastify.delete<{ Params: { id: string, productId: string } }>('/vendors/:id/products/:productId', async (request, reply) => {
+    let productId: bigint;
+    try { productId = BigInt(request.params.productId); }
+    catch { return reply.status(400).send({ error: 'Invalid product ID' }); }
+
+    await prisma.product.delete({
+      where: { id: productId }
+    });
+    return { success: true };
+  });
+
+  // ── Re-index Un-indexed Catalog Products ──────────────────────────
+  fastify.post<{ Params: { id: string } }>('/vendors/:id/products/reindex', async (request, reply) => {
+    let id: bigint;
+    try { id = BigInt(request.params.id); }
+    catch { return reply.status(400).send({ error: 'Invalid vendor ID' }); }
+
+    // Find products for vendor that do not have embeddings yet
+    const unindexed = await prisma.$queryRaw<Array<{ id: bigint; name: string; description: string | null }>>`
+      SELECT id, name, description
+      FROM products
+      WHERE "vendorId" = ${id} AND embedding IS NULL
+    `;
+
+    for (const p of unindexed) {
+      const text = [p.name, p.description].filter(Boolean).join(' — ');
+      await embedQueue.add(`embed:${p.id}_${Date.now()}`, {
+        productId: p.id.toString(),
+        text
+      }).catch(err => {
+        console.warn(`Embed re-index queue warning for product ${p.id}:`, err.message);
+      });
+    }
+
+    return {
+      success: true,
+      enqueuedCount: unindexed.length,
+      message: `Enqueued ${unindexed.length} un-indexed products for vector embedding.`
+    };
+  });
+
+  // ── AI Business Advisor Daily Briefing ─────────────────────────────
+  fastify.get<{ Params: { id: string } }>('/vendors/:id/advisor/today', async (request, reply) => {
+    let vendorId: bigint;
+    try { vendorId = BigInt(request.params.id); }
+    catch { return reply.status(400).send({ error: 'Invalid vendor ID' }); }
+
+    try {
+      const data = await AdvisorService.getTodayBriefing(vendorId);
+      return data;
+    } catch (err: any) {
+      console.error("Advisor today briefing error:", err.message);
+      return reply.status(500).send({ error: "Failed to load advisor briefing" });
+    }
+  });
+
+  // ── AI Business Advisor Chat Q&A ──────────────────────────────────
+  fastify.post<{ Params: { id: string }; Body: { question: string; history?: Array<{ role: 'user' | 'assistant'; content: string }> } }>('/vendors/:id/advisor/chat', async (request, reply) => {
+    let vendorId: bigint;
+    try { vendorId = BigInt(request.params.id); }
+    catch { return reply.status(400).send({ error: 'Invalid vendor ID' }); }
+
+    const { question, history = [] } = request.body || {};
+    if (!question || typeof question !== 'string') {
+      return reply.status(400).send({ error: 'Question is required' });
+    }
+
+    try {
+      const answer = await AdvisorService.askAdvisor(vendorId, question, history);
+      return { reply: answer };
+    } catch (err: any) {
+      console.error("Advisor chat error:", err.message);
+      return reply.status(500).send({ error: "Failed to query advisor" });
+    }
+  });
+
+  // ── Get Settings ──────────────────────────────────────────────────
+  fastify.get<{ Params: { id: string } }>('/vendors/:id/settings', async (request, reply) => {
+    let id: bigint;
+    try { id = BigInt(request.params.id); }
+    catch { return reply.status(400).send({ error: 'Invalid vendor ID' }); }
+    const vendor = await prisma.vendor.findUnique({
+      where: { id },
+      select: { name: true, email: true, phoneNumber: true, agentName: true, agentTone: true, agentGreeting: true, monnifySubaccountCode: true }
+    });
+    if (!vendor) return reply.status(404).send({ error: 'Vendor not found' });
+    return {
+      settings: {
+        name: vendor.name,
+        email: vendor.email,
+        phoneNumber: vendor.phoneNumber,
+        agentName: vendor.agentName || vendor.name,
+        agentTone: vendor.agentTone || 'Friendly',
+        agentGreeting: vendor.agentGreeting || `Hello! I am ${vendor.agentName || vendor.name}'s AI sales agent. How can I help you today?`,
+        monnifySubaccountCode: vendor.monnifySubaccountCode || null
+      }
+    };
+  });
+
+  // ── Save Settings ─────────────────────────────────────────────────
+  fastify.post<{ Params: { id: string }; Body: { name?: string; email?: string; agentName?: string; agentTone?: string; agentGreeting?: string } }>('/vendors/:id/settings', async (request, reply) => {
+    let id: bigint;
+    try { id = BigInt(request.params.id); }
+    catch { return reply.status(400).send({ error: 'Invalid vendor ID' }); }
+    const { name, email, agentName, agentTone, agentGreeting } = request.body;
+
+    const updateData: any = {};
+    if (name !== undefined) updateData.name = name;
+    if (email !== undefined) updateData.email = email;
+    if (agentName !== undefined) updateData.agentName = agentName;
+    if (agentTone !== undefined) updateData.agentTone = agentTone;
+    if (agentGreeting !== undefined) updateData.agentGreeting = agentGreeting;
+
+    const vendor = await prisma.vendor.update({
+      where: { id },
+      data: updateData,
+      select: { name: true, email: true, phoneNumber: true, agentName: true, agentTone: true, agentGreeting: true }
+    });
+
+    return {
+      settings: {
+        name: vendor.name,
+        email: vendor.email,
+        phoneNumber: vendor.phoneNumber,
+        agentName: vendor.agentName,
+        agentTone: vendor.agentTone,
+        agentGreeting: vendor.agentGreeting
+      }
+    };
+  });
+
+  // ── AI Business Insights ─────────────────────────────────────────
+  fastify.get<{ Params: { id: string }; Querystring: { period?: '7d' | '30d' } }>('/vendors/:id/insights', async (request, reply) => {
+    let id: bigint;
+    try { id = BigInt(request.params.id); }
+    catch { return reply.status(400).send({ error: 'Invalid vendor ID' }); }
+
+    const period = request.query.period === '30d' ? '30d' : '7d';
+    const vendor = await prisma.vendor.findUnique({ where: { id }, select: { id: true } });
+    if (!vendor) return reply.status(404).send({ error: 'Vendor not found' });
+
+    return BusinessInsightsService.build(id, period);
+  });
+
+  fastify.post<{ Params: { id: string }; Body: { period?: '7d' | '30d'; question?: string } }>('/vendors/:id/insights', async (request, reply) => {
+    let id: bigint;
+    try { id = BigInt(request.params.id); }
+    catch { return reply.status(400).send({ error: 'Invalid vendor ID' }); }
+
+    const period = request.body.period === '30d' ? '30d' : '7d';
+    const question = request.body.question?.trim();
+    if (!question) return reply.status(400).send({ error: 'Question is required' });
+
+    const vendor = await prisma.vendor.findUnique({ where: { id }, select: { id: true } });
+    if (!vendor) return reply.status(404).send({ error: 'Vendor not found' });
+
+    return BusinessInsightsService.ask(id, period, question);
+  });
+
+  // ── Setup Monnify Subaccount settings ─────────────────────────────
+  fastify.post<{ Params: { id: string }; Body: { bankCode: string; accountNumber: string; email: string; subAccountName: string } }>('/vendors/:id/settings/subaccount', async (request, reply) => {
+    let id: bigint;
+    try { id = BigInt(request.params.id); }
+    catch { return reply.status(400).send({ error: 'Invalid vendor ID' }); }
+
+    const { bankCode, accountNumber, email, subAccountName } = request.body;
+    if (!bankCode || !accountNumber || !email || !subAccountName) {
+      return reply.status(400).send({ error: 'Missing required subaccount details' });
+    }
+
+    const subaccountCode = await MonnifyService.createSubaccount({
+      bankCode,
+      accountNumber,
+      email,
+      subAccountName
+    });
+
+    if (!subaccountCode) {
+      return reply.status(500).send({ error: 'Failed to create Monnify subaccount' });
+    }
+
+    await prisma.vendor.update({
+      where: { id },
+      data: { monnifySubaccountCode: subaccountCode }
+    });
+
+    return { success: true, subaccountCode };
+  });
+
+  // ── Monnify Webhook ────────────────────────────────────────────────
+  // Parse JSON globally but stash raw string on request for HMAC verification
+  fastify.addContentTypeParser('application/json', { parseAs: 'string' }, (req, body: string, done) => {
+    (req as any).rawBody = body;
+    try {
+      done(null, JSON.parse(body));
+    } catch (e: any) {
+      done(e);
+    }
+  });
+
+  fastify.post('/webhooks/monnify', async (request, reply) => {
+    const rawBody = (request as any).rawBody as string;
+    const signature = (request.headers['monnify-signature'] || request.headers['x-monnify-signature']) as string;
+
+    if (!MonnifyService.verifyWebhookSignature(rawBody, signature)) {
+      return reply.status(400).send({ error: 'Invalid signature' });
+    }
+
+    const payload = request.body as any;
+    const eventType = payload?.eventType;
+    const eventData = payload?.eventData || {};
+
+    if (eventType === 'SUCCESSFUL_TRANSACTION' && (eventData.paymentStatus === 'PAID' || eventData.paymentStatus === 'SUCCESSFUL')) {
+      const paymentReference = eventData.paymentReference as string;
+      const amountPaid = Number(eventData.amountPaid || eventData.totalPayable || 0);
+
+      // Wallet top-up payment
+      if (paymentReference && paymentReference.startsWith('TOPUP-')) {
+        const parts = paymentReference.split('-');
+        const vendorIdStr = parts[1];
+        if (vendorIdStr) {
+          const vendorId = BigInt(vendorIdStr);
+          await prisma.vendor.update({
+            where: { id: vendorId },
+            data: { walletBalance: { increment: amountPaid } }
+          });
+          console.log(`💳 Wallet top-up via Monnify: vendor ${vendorIdStr} +₦${amountPaid}`);
+          return reply.status(200).send({ received: true });
+        }
+      }
+
+      // Order payment
+      let order = await prisma.order.findFirst({
+        where: {
+          OR: [
+            { paymentLink: paymentReference },
+            { paymentLink: eventData.transactionReference }
+          ]
+        },
+        include: { items: { include: { product: true } }, customer: true }
+      });
+
+      if (!order) {
+        const customer = await prisma.customer.findFirst({
+          where: { reservedAccountReference: paymentReference }
+        });
+        if (customer) {
+          order = await prisma.order.findFirst({
+            where: { customerId: customer.id, status: 'PENDING' },
+            orderBy: { createdAt: 'desc' },
+            include: { items: { include: { product: true } }, customer: true }
+          });
+        }
+      }
+
+      if (!order || order.status !== 'PENDING') return reply.status(200).send({ received: true });
+      const orderId = order.id;
+
+      // Mark order paid
+      await prisma.order.update({ where: { id: orderId }, data: { status: 'PAID' } });
+
+      // Release reserved stock
+      for (const item of order.items) {
+        await prisma.product.update({
+          where: { id: item.productId },
+          data: { reservedStock: { decrement: item.quantity }, stock: { decrement: item.quantity } }
+        });
+      }
+
+      // Mark reservation released so the 30-min job is a no-op
+      await prisma.softReservation.updateMany({
+        where: { orderId },
+        data: { released: true }
+      });
+
+      // Send receipt via outbound queue
+      const itemsList = order.items
+        .map(i => `• ${i.quantity}× ${i.product.name} — ₦${Number(i.price) * i.quantity}`)
+        .join('\n');
+
+      await outboundQueue.add(`receipt:${orderId}`, {
+        vendorId: order.vendorId.toString(),
+        remoteJid: `${order.customer.phoneNumber}@s.whatsapp.net`,
+        content: `Payment confirmed! Thank you.\n\nOrder #${orderId}\n${itemsList}\n\nTotal: ₦${Number(order.total).toFixed(2)}\n\nYour order is being prepared.`
+      });
+
+      console.log(`✅ Order ${orderId} marked PAID via Monnify, receipt queued`);
+    }
+
+    return reply.status(200).send({ received: true });
+  });
+
+  const port = Number(process.env.PORT) || 3000;
+  await fastify.listen({ port, host: '0.0.0.0' });
+  console.log(`🚀 Gateway running on port ${port}`);
+};
+
+start().catch(err => {
+  console.error(err);
+  process.exit(1);
+});

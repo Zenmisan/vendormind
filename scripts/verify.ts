@@ -1,0 +1,104 @@
+/**
+ * End-to-end smoke test — verifies the full message loop works without WhatsApp.
+ * Sends browse → add to cart → location pin, checks bot replies for each.
+ * Usage: bun run scripts/verify.ts
+ */
+
+import { inboundQueue, outboundQueue, OUTBOUND_QUEUE, OutboundMessageJob } from '../src/shared/queue';
+import { redisConnection } from '../src/shared/redis';
+import { prisma } from '../src/shared/prisma/client';
+import { ContextService } from '../src/shared/context.service';
+import { Worker } from 'bullmq';
+
+const CUSTOMER_PHONE = '234999888777';
+const VENDOR_ID = process.env.VENDOR_ID || '1';
+const TIMEOUT_MS = 45000;
+
+async function send(type: 'text' | 'location', content?: string, location?: { lat: number; lng: number }) {
+  const messageId = `verify-${Date.now()}`;
+  await inboundQueue.add(`${CUSTOMER_PHONE}:${messageId}`, {
+    vendorId: VENDOR_ID, customerPhone: CUSTOMER_PHONE, messageId, type,
+    content, location, timestamp: Date.now()
+  });
+}
+
+async function waitForReply(label: string, timeoutMs: number = TIMEOUT_MS): Promise<string | null> {
+  let worker: Worker<OutboundMessageJob> | null = null;
+  const result = await new Promise<string | null>(resolve => {
+    const timeout = setTimeout(() => resolve(null), timeoutMs);
+
+    worker = new Worker<OutboundMessageJob>(OUTBOUND_QUEUE, async (job) => {
+      clearTimeout(timeout);
+      resolve(job.data.content);
+    }, { connection: redisConnection });
+  });
+
+  if (worker) {
+    await (worker as Worker).close();
+  }
+  return result;
+}
+
+async function main() {
+  console.log('=== VendorMind E2E Verification ===\n');
+
+  // Clean up previous test session
+  const existing = await prisma.customer.findUnique({
+    where: { vendorId_phoneNumber: { vendorId: BigInt(VENDOR_ID), phoneNumber: CUSTOMER_PHONE } }
+  });
+  if (existing) {
+    await prisma.wa_session.deleteMany({ where: { customerId: existing.id } });
+    await prisma.cart.deleteMany({ where: { customerId: existing.id } });
+    await prisma.order.deleteMany({ where: { customerId: existing.id } });
+    await redisConnection.del(`handoff:${existing.id}`);
+    console.log('Cleaned up previous session context and cart.\n');
+  }
+
+  await inboundQueue.drain();
+  await outboundQueue.drain();
+  console.log('Drained inbound and outbound queues.\n');
+
+  const steps: Array<{ label: string; fn: () => Promise<void>; expectedReply?: boolean; timeout?: number }> = [
+    { label: 'Personal stand-down', fn: () => send('text', 'wanna hang out tonight?'), expectedReply: false, timeout: 3000 },
+    { label: 'Browse catalog', fn: () => send('text', 'browse catalog'), expectedReply: true },
+    { label: 'Add to cart',    fn: () => send('text', 'add coffee to cart'), expectedReply: true },
+    { label: 'Location pin',   fn: () => send('location', undefined, { lat: 6.5244, lng: 3.3792 }), expectedReply: true },
+    { label: 'Policy query',   fn: () => send('text', 'what is your refund policy?'), expectedReply: true },
+  ];
+
+  let passed = 0;
+  for (const step of steps) {
+    process.stdout.write(`  ${step.label}... `);
+    await step.fn();
+    const reply = await waitForReply(step.label, step.timeout);
+    if (step.expectedReply === false) {
+      if (!reply) {
+        console.log('✅ Stood down (No reply sent)');
+        passed++;
+      } else {
+        console.log(`❌ Failed: Bot replied: "${reply.slice(0, 30)}..."`);
+      }
+    } else {
+      if (reply) {
+        console.log(`✅ Got reply (${reply.length} chars)`);
+        passed++;
+      } else {
+        console.log('❌ Timed out');
+      }
+    }
+  }
+
+  // Verify context was saved
+  const finalCustomer = await prisma.customer.findUnique({
+    where: { vendorId_phoneNumber: { vendorId: BigInt(VENDOR_ID), phoneNumber: CUSTOMER_PHONE } }
+  });
+  if (finalCustomer) {
+    const ctx = await ContextService.getContext(finalCustomer.id);
+    console.log(`\nContext: summary="${ctx.summary.slice(0, 60)}...", recent=${ctx.recentMessages.length} msgs`);
+  }
+
+  console.log(`\n=== ${passed}/${steps.length} steps passed ===`);
+  process.exit(passed === steps.length ? 0 : 1);
+}
+
+main().catch(err => { console.error(err); process.exit(1); });
